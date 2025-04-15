@@ -8,7 +8,7 @@
 
 A VS Code extension providing TOML language support. Built on top of a native TOML implementation.
 
-![TOML Semantic Highlighting Demo](./img/demo.png)
+![TOML Semantic Highlighting Demo](https://raw.githubusercontent.com/nullptr-0/toml/refs/heads/master/extension/VSCode/img/demo.png)
 
 ## Features
 
@@ -64,7 +64,7 @@ Valid semantic tokens are: `datetime`, `number`, `boolean`, `identifier`, `punct
 ## Development
 
 ### Prerequisites
-- Node.js 20.x
+- Node.js 20.x (older versions may also work but not recommended)
 - VS Code 1.98+
 - Native TOML Backend ([see core implementation](https://github.com/nullptr-0/toml))
 
