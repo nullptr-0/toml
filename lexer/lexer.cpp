@@ -1,0 +1,403 @@
+﻿#include <iostream>
+#include <string>
+#include <list>
+#include <tuple>
+#include <regex>
+#include "../shared/CheckFunctions.h"
+#include "../shared/Token.h"
+
+std::pair<size_t, size_t> getEndPosition(const std::string& text, size_t startLine, size_t startCol) {
+    size_t line = startLine;
+    size_t col = startCol;
+
+    for (char ch : text) {
+        if (ch == '\n') {
+            ++line;
+            col = 0;
+        }
+        else {
+            ++col;
+        }
+    }
+
+    return { line, col };
+}
+
+bool isNumberReasonablyGrouped(const std::string& str) {
+    size_t dotPos = str.find('.');
+    std::string beforeDot = str.substr(0, dotPos);
+    if (beforeDot.size() && (beforeDot[0] == '+' || beforeDot[0] == '-')) {
+        beforeDot.erase(0, 1);
+    }
+    if (beforeDot.size() > 2 && beforeDot[0] == '0' && (beforeDot[1] == 'b' || beforeDot[1] == 'o' || beforeDot[1] == 'x')) {
+        beforeDot.erase(0, 2);
+    }
+    std::string afterDot = dotPos > str.size() ? "" : str.substr(dotPos + 1);
+
+    std::vector<std::string> parts;
+    std::vector<size_t> sizes;
+
+    // Split by underscores
+    size_t start = 0, end;
+    while ((end = beforeDot.find('_', start)) != std::string::npos) {
+        const auto part = beforeDot.substr(start, end - start);
+        if (part.empty()) return false; // invalid like "1__000"
+        parts.push_back(part);
+        sizes.push_back(part.size());
+        start = end + 1;
+    }
+    parts.push_back(beforeDot.substr(start));
+    sizes.push_back(parts.back().size());
+
+    if (parts.size() != 1) { // Has underscores
+        bool allSame = true;
+
+        for (size_t i = 1; i < sizes.size(); ++i) {
+            if (sizes[i] != sizes[1]) {
+                allSame = false;
+                break;
+            }
+        }
+        if (allSame) {
+            if (sizes[1] == 1) {
+                return false;
+            }
+        }
+        else {
+            allSame = true;
+            for (size_t i = 1; i < sizes.size() - 1; ++i) {
+                if (sizes[i] != 2) {
+                    allSame = false;
+                    break;
+                }
+            }
+            if (!allSame || sizes[sizes.size() - 1] != 3) {
+                return false;
+            }
+        }
+    }
+
+    parts.clear();
+    sizes.clear();
+    start = 0;
+    while ((end = afterDot.find('_', start)) != std::string::npos) {
+        const auto part = afterDot.substr(start, end - start);
+        if (part.empty()) return false; // invalid like "1__000"
+        parts.push_back(part);
+        sizes.push_back(part.size());
+        start = end + 1;
+    }
+    parts.push_back(afterDot.substr(start));
+    sizes.push_back(parts.back().size());
+
+    if (parts.size() == 1) return true; // No underscores
+
+    bool allSame = true;
+
+    for (size_t i = 1; i < sizes.size(); ++i) {
+        if (sizes[i] != sizes[1]) {
+            allSame = false;
+            break;
+        }
+    }
+    if (!allSame) return false;
+    if (sizes[1] == 1) {
+        return false;
+    }
+
+    return true;
+}
+
+bool isStringContentValid(const std::string& stringToCheck, int stringType) {
+    size_t i = 0;
+    while (i < stringToCheck.size()) {
+        uint32_t codepoint = 0;
+        unsigned char c = stringToCheck[i];
+
+        size_t bytes = 0;
+        if ((c & 0x80) == 0) {
+            // 1-byte ASCII
+            codepoint = c;
+            bytes = 1;
+        }
+        else if ((c & 0xE0) == 0xC0) {
+            // 2-byte
+            if (i + 1 >= stringToCheck.size()) return false;
+            unsigned char c1 = stringToCheck[i + 1];
+            if ((c1 & 0xC0) != 0x80) return false;
+
+            codepoint = ((c & 0x1F) << 6) | (c1 & 0x3F);
+            if (codepoint < 0x80) return false;  // Overlong
+            bytes = 2;
+        }
+        else if ((c & 0xF0) == 0xE0) {
+            // 3-byte
+            if (i + 2 >= stringToCheck.size()) return false;
+            unsigned char c1 = stringToCheck[i + 1];
+            unsigned char c2 = stringToCheck[i + 2];
+            if ((c1 & 0xC0) != 0x80 || (c2 & 0xC0) != 0x80) return false;
+
+            codepoint = ((c & 0x0F) << 12) |
+                ((c1 & 0x3F) << 6) |
+                (c2 & 0x3F);
+            if (codepoint < 0x800) return false;        // Overlong
+            if (codepoint >= 0xD800 && codepoint <= 0xDFFF) return false;  // Surrogates
+            bytes = 3;
+        }
+        else if ((c & 0xF8) == 0xF0) {
+            // 4-byte
+            if (i + 3 >= stringToCheck.size()) return false;
+            unsigned char c1 = stringToCheck[i + 1];
+            unsigned char c2 = stringToCheck[i + 2];
+            unsigned char c3 = stringToCheck[i + 3];
+            if ((c1 & 0xC0) != 0x80 ||
+                (c2 & 0xC0) != 0x80 ||
+                (c3 & 0xC0) != 0x80) return false;
+
+            codepoint = ((c & 0x07) << 18) |
+                ((c1 & 0x3F) << 12) |
+                ((c2 & 0x3F) << 6) |
+                (c3 & 0x3F);
+            if (codepoint < 0x10000 || codepoint > 0x10FFFF) return false;  // Overlong or out of range
+            bytes = 4;
+        }
+        else {
+            // Invalid leading byte
+            return false;
+        }
+
+        if ((stringType == 0 || stringType == 2) &&
+            (codepoint >= 0x0000 && codepoint <= 0x0008 ||
+            codepoint >= 0x000A && codepoint <= 0x001F ||
+            codepoint == 0x007F)) {
+            return false;
+        }
+
+        if (stringType == 1 || stringType == 3) {
+            if (codepoint >= 0x0000 && codepoint <= 0x0008 ||
+                codepoint == 0x000B || codepoint == 0x000C ||
+                codepoint >= 0x000E && codepoint <= 0x001F ||
+                codepoint == 0x007F) {
+                return false;
+            }
+            else if (codepoint == 0x000D &&
+                (i + 1 >= stringToCheck.size() || stringToCheck[i] != 0x000A)) {
+                return false;
+            }
+        }
+
+        i += bytes;
+    }
+
+    return true;
+}
+
+std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>> lexerMain(std::istream& inputCode, bool multilineToken = true)
+{
+    Token::TokenList<> tokenList;
+    std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> errors;
+    std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> warnings;
+    std::string codeToProcess;
+    size_t currentLine = 0;
+    size_t currentCol = 0;
+    std::string curLine;
+    bool isContinued = false;
+    while (std::getline(inputCode, curLine)) {
+        if (std::regex_match(curLine, std::regex(R"(\s*)"))) {
+            if (std::regex_search(curLine, std::regex(R"(\r(?!\n))"))) {
+                errors.push_back({ "Line ending is not valid.", currentLine, 0, currentLine, curLine.size() });
+            }
+            ++currentLine;
+            currentCol = 0;
+            if (inputCode.peek() != -1 || std::regex_match(codeToProcess, std::regex(R"(\s+)"))) {
+                continue;
+            }
+        }
+        if (isContinued) {
+            codeToProcess += curLine;
+        }
+        else {
+            codeToProcess = curLine;
+        }
+        if (HasIncompleteString(codeToProcess)) {
+            isContinued = true;
+            codeToProcess += "\n";
+            if (inputCode.peek() != -1) {
+                continue;
+            }
+            else {
+				errors.push_back({ "String literal is not closed.", currentLine, 0, currentLine, codeToProcess.find('\n')});
+            }
+        }
+        isContinued = false;
+        bool commentAppearsFirst = firstAppearedStringOrCommentStarter(codeToProcess) == "#";
+        while (codeToProcess.size()) {
+            // Comment
+            auto procComment = [&]() {
+                auto [tokenStartIndex, tokenContent] = CheckComment(codeToProcess);
+                if (!tokenContent.empty()) {
+                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
+                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
+                    tokenList.AddTokenToList(tokenContent, "comment", nullptr, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
+                    currentLine = tokenEndLine;
+                    currentCol = tokenEndCol;
+                    codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                    if (tokenContent.find('#') >= tokenContent.size() ? false : !isStringContentValid(tokenContent.substr(tokenContent.find('#') + 1), 0)) {
+                        errors.push_back({ "Comment contains invalid content.", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+                    }
+                    return true;
+                }
+                return false;
+            };
+            // String Literal
+            auto procString = [&]() {
+                auto [tokenType, tokenStartIndex, tokenContent] = CheckStringLiteral(codeToProcess);
+                if (!tokenContent.empty()) {
+                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
+                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
+                    tokenList.AddTokenToList(tokenContent, "string", tokenType, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
+                    currentLine = tokenEndLine;
+                    currentCol = tokenEndCol;
+                    codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                    if (!isStringContentValid(tokenContent, ((Type::String*)tokenType)->getType())) {
+                        errors.push_back({ "String literal contains invalid content.", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+                    }
+                    return true;
+                }
+                return false;
+            };
+            if (commentAppearsFirst) {
+                if (procComment()) {
+                    continue;
+                }
+                if (procString()) {
+                    continue;
+                }
+            }
+            else {
+                if (procString()) {
+                    continue;
+                }
+                if (procComment()) {
+                    continue;
+                }
+            }
+            // Date Time Literal
+            {
+                auto [tokenType, tokenStartIndex, tokenContent] = CheckDateTimeLiteral(codeToProcess);
+                if (!tokenContent.empty()) {
+                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
+                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
+                    tokenList.AddTokenToList(tokenContent, "datetime", tokenType, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
+                    currentLine = tokenEndLine;
+                    currentCol = tokenEndCol;
+                    codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                    continue;
+                }
+            }
+            // Numeric Literal
+            {
+                auto [tokenType, tokenStartIndex, tokenContent] = CheckNumericLiteral(codeToProcess);
+                if (!tokenContent.empty()) {
+                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
+                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
+                    tokenList.AddTokenToList(tokenContent, "number", tokenType, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
+                    currentLine = tokenEndLine;
+                    currentCol = tokenEndCol;
+                    codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                    if (tokenContent.size() > 3 && (tokenContent[0] == '+' || tokenContent[0] == '-') && tokenContent[1] == '0' && (tokenContent[2] == 'b' || tokenContent[2] == 'o' || tokenContent[2] == 'x')) {
+                        errors.push_back({ "Number literal in hexadecimal, octal or binary cannot have a positive or negative sign.", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+                    }
+                    if (!isNumberReasonablyGrouped(tokenContent)) {
+                        warnings.push_back({ "Number literal is not grouped reasonably.", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+                    }
+                    continue;
+                }
+            }
+            // Boolean Literal
+            {
+                auto [tokenType, tokenStartIndex, tokenContent] = CheckBooleanLiteral(codeToProcess);
+                if (!tokenContent.empty()) {
+                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
+                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
+                    tokenList.AddTokenToList(tokenContent, "boolean", new Type::Boolean(), tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
+                    currentLine = tokenEndLine;
+                    currentCol = tokenEndCol;
+                    codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                    continue;
+                }
+            }
+            // Identifier
+            {
+                auto [tokenStartIndex, tokenContent] = CheckIdentifier(codeToProcess);
+                if (!tokenContent.empty()) {
+                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
+                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
+                    tokenList.AddTokenToList(tokenContent, "identifier", nullptr, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
+                    currentLine = tokenEndLine;
+                    currentCol = tokenEndCol;
+                    codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                    continue;
+                }
+            }
+            // Punctuator
+            {
+                auto [tokenStartIndex, tokenContent] = CheckPunctuator(codeToProcess);
+                if (!tokenContent.empty()) {
+                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
+                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
+                    tokenList.AddTokenToList(tokenContent, "punctuator", nullptr, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
+                    currentLine = tokenEndLine;
+                    currentCol = tokenEndCol;
+                    codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                    continue;
+                }
+            }
+            // Operator
+            {
+                auto [tokenStartIndex, tokenContent] = CheckOperator(codeToProcess);
+                if (!tokenContent.empty()) {
+                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
+                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
+                    tokenList.AddTokenToList(tokenContent, "operator", nullptr, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
+                    currentLine = tokenEndLine;
+                    currentCol = tokenEndCol;
+                    codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                    continue;
+                }
+            }
+
+            if (std::regex_match(codeToProcess, std::regex(R"(\s*)"))) {
+                auto [tokenEndLine, tokenEndCol] = getEndPosition(codeToProcess, currentLine, currentCol);
+                currentLine = tokenEndLine;
+                currentCol = tokenEndCol;
+                codeToProcess.clear();
+                continue;
+            }
+
+            // Unknown Content
+            if (!tokenList.IsTokenBuffered()) {
+                tokenList.SetTokenInfo("unknown");
+            }
+            tokenList.AppendBufferedToken(codeToProcess[0]);
+            if (codeToProcess[0] == '\n') {
+                ++currentLine;
+                currentCol = 0;
+            }
+            else {
+                ++currentCol;
+            }
+            codeToProcess.erase(0, 1);
+        }
+        tokenList.FlushBuffer();
+        ++currentLine;
+        currentCol = 0;
+    }
+    for (const auto& token : tokenList) {
+        auto [tokenContent, tokenType, tokenProp, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol] = token;
+        if (tokenType == "unknown") {
+            errors.push_back({ "Unknown token: " + tokenContent + ".", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+        }
+    }
+    return { tokenList, errors, warnings };
+}

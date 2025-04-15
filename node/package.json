@@ -1,0 +1,22 @@
+{
+  "name": "toml-node",
+  "version": "1.0.0",
+  "description": "NodeJS Wrapper For TOML Inplementation",
+  "main": "./out/toml.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nullptr-0/toml.git"
+  },
+  "author": "nullptr-0",
+  "bugs": {
+    "url": "https://github.com/nullptr-0/toml/issues"
+  },
+  "homepage": "https://github.com/nullptr-0/toml#readme",
+  "scripts": {
+    "compile": "tsc -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "^5.8.3"
+  }
+}

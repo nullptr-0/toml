@@ -1,0 +1,116 @@
+{
+  "name": "toml",
+  "displayName": "TOML",
+  "description": "TOML Language Service",
+  "version": "0.0.1",
+  "author": "nullptr-0",
+  "publisher": "nullptr-0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nullptr-0/toml.git"
+  },
+  "engines": {
+    "vscode": "^1.98.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "icon": "./img/toml.png",
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "toml",
+        "aliases": [
+          "TOML"
+        ],
+        "extensions": [
+          ".toml"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "semanticTokenTypes": [
+      {
+        "id": "datetime",
+        "superType": "string",
+        "description": "A date-time."
+      },
+      {
+        "id": "boolean",
+        "superType": "keyword",
+        "description": "A boolean value."
+      },
+      {
+        "id": "identifier",
+        "superType": "variable",
+        "description": "An identifier."
+      },
+      {
+        "id": "punctuator",
+        "superType": "operator",
+        "description": "A punctuator."
+      },
+      {
+        "id": "unknown",
+        "description": "An unknown type of token."
+      }
+    ],
+    "semanticTokenModifiers": [],
+    "semanticTokenScopes": [
+      {
+        "scopes": {
+          "datetime": [
+            "string.interpolated"
+          ],
+          "number": [
+            "constant.numeric"
+          ],
+          "boolean": [
+            "constant.language"
+          ],
+          "identifier": [
+            "variable.other"
+          ],
+          "punctuator": [
+            "punctuation.separator"
+          ],
+          "operator": [
+            "keyword.operator"
+          ],
+          "comment": [
+            "comment.line.number-sign"
+          ],
+          "string": [
+            "string.quoted.double"
+          ],
+          "unknown": [
+            "invalid.illegal"
+          ]
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "npm run check-types && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "vscode:prepublish": "npm run package",
+    "package": "npm run check-types && node esbuild.js --production",
+    "dev": "tsc -p ./",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "@types/vscode": "^1.98.0",
+    "@typescript-eslint/eslint-plugin": "^8.28.0",
+    "@typescript-eslint/parser": "^8.28.0",
+    "esbuild": "^0.25.2",
+    "eslint": "^9.23.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.8.2",
+    "vscode-languageclient": "^8.0.0"
+  }
+}
