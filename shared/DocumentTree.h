@@ -10,6 +10,7 @@
 #include <any>
 #include "Type.h"
 #include "TypeUtils.h"
+#include "FilePosition.h"
 
 // get value from variable 'std::any value'
 #define get_any_val(varRealType, varName) \
@@ -61,10 +62,9 @@ namespace DocTree
 
     class Array : public DocTreeNode {
         using ValueArray = std::vector<DocTreeNode*>;
-        using DefinitionPosition = std::tuple<size_t, size_t, size_t, size_t>;
 
     public:
-        Array(ValueArray elems, bool isMutable, DefinitionPosition defPos)
+        Array(ValueArray elems, bool isMutable, FilePosition::Region defPos)
             : elems(elems), isMutable(isMutable), defPos(defPos) {}
 
         ~Array() {
@@ -75,7 +75,7 @@ namespace DocTree
             }
         }
 
-        std::tuple<ValueArray, bool, DefinitionPosition> get() const {
+        std::tuple<ValueArray, bool, FilePosition::Region> get() const {
             return std::make_tuple(elems, isMutable, defPos);
         }
 
@@ -88,7 +88,7 @@ namespace DocTree
                 get_any_val(bool, this->isMutable)
             }
             else if constexpr (N == 2) {
-                get_any_val(DefinitionPosition, this->defPos)
+                get_any_val(FilePosition::Region, this->defPos)
             }
             else {
                 throw std::invalid_argument("Invalid setter index");
@@ -110,7 +110,7 @@ namespace DocTree
     protected:
         ValueArray elems;
         bool isMutable;
-        DefinitionPosition defPos;
+        FilePosition::Region defPos;
     };
 
     class Key : public DocTreeNode {
@@ -147,10 +147,9 @@ namespace DocTree
 
     class Table : public DocTreeNode {
         using KeyTable = std::unordered_map<std::string, Key*>;
-        using DefinitionPosition = std::tuple<size_t, size_t, size_t, size_t>;
 
     public:
-        Table(KeyTable elems, bool isMutable, DefinitionPosition defPos, bool isExplicitlyDefined)
+        Table(KeyTable elems, bool isMutable, FilePosition::Region defPos, bool isExplicitlyDefined)
             : elems(elems), isMutable(isMutable), defPos(defPos), isExplicitlyDefined(isExplicitlyDefined) {}
 
         ~Table() {
@@ -161,7 +160,7 @@ namespace DocTree
             }
         }
 
-        std::tuple<KeyTable, bool, DefinitionPosition, bool> get() const {
+        std::tuple<KeyTable, bool, FilePosition::Region, bool> get() const {
             return std::make_tuple(elems, isMutable, defPos, isExplicitlyDefined);
         }
 
@@ -174,7 +173,7 @@ namespace DocTree
                 get_any_val(bool, this->isMutable)
             }
             else if constexpr (N == 2) {
-                get_any_val(DefinitionPosition, this->defPos)
+                get_any_val(FilePosition::Region, this->defPos)
             }
             else if constexpr (N == 3) {
                 get_any_val(bool, this->isExplicitlyDefined)
@@ -207,7 +206,7 @@ namespace DocTree
     protected:
         KeyTable elems;
         bool isMutable;
-        DefinitionPosition defPos;
+        FilePosition::Region defPos;
         bool isExplicitlyDefined;
     };
 };

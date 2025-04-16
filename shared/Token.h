@@ -9,6 +9,7 @@
 #include <tuple>
 #include "Type.h"
 #include "TypeUtils.h"
+#include "FilePosition.h"
 
 namespace Token
 {
@@ -22,9 +23,9 @@ namespace Token
     class TokenList {
     public:
         // content, tokenType, contentType, startLine, startCol, endLine, endCol
-        using Token = std::tuple<std::string, std::string, TokenPropertyType*, size_t, size_t, size_t, size_t>;
+        using Token = std::tuple<std::string, std::string, TokenPropertyType*, FilePosition::Region>;
 
-        TokenList() : curTokenProp(nullptr), tokenBuffered(false), curTokenStartLine(0), curTokenStartCol(0), curTokenEndLine(0), curTokenEndCol(0) {}
+        TokenList() : curTokenProp(nullptr), tokenBuffered(false), curTokenRegion({ 0, 0, 0, 0 }) {}
         virtual ~TokenList() {}
 
         // Add the specified token to list.
@@ -34,11 +35,10 @@ namespace Token
         // information to be cleared.
         void AddTokenToList(std::string tokenContent, std::string tokenType,
             TokenPropertyType* contentType = nullptr,
-            size_t startLine = 0, size_t startCol = 0,
-            size_t endLine = 0, size_t endCol = 0) {
+            FilePosition::Region region = { 0,0,0,0 }) {
             FlushBuffer();
             tokenList.push_back(std::make_tuple(tokenContent, tokenType,
-                contentType, startLine, startCol, endLine, endCol));
+                contentType, region));
         }
 
         // Set information for the current buffered token.
@@ -50,39 +50,27 @@ namespace Token
         // memory leakage.
         void SetTokenInfo(std::string tokenType,
             TokenPropertyType* contentType = nullptr,
-            size_t startLine = 0, size_t startCol = 0,
-            size_t endLine = 0, size_t endCol = 0) {
+            FilePosition::Region region = { 0,0,0,0 }) {
             curTokenType = tokenType;
-            curTokenProp = contentType;
-            curTokenStartLine = startLine;
-            curTokenStartCol = startCol;
-            curTokenEndLine = endLine;
-            curTokenEndCol = endCol;
+            curTokenRegion = region;
         }
 
         void AppendBufferedToken(const char newContent) {
             curTokenContent.append(1, newContent);
             if (!tokenBuffered) {
                 if (!tokenList.empty()) {
-                    auto lastToken = *std::prev(tokenList.end());
-                    curTokenStartLine = std::get<5>(lastToken);
-                    curTokenStartCol = std::get<6>(lastToken);
-                    curTokenEndLine = curTokenStartLine;
-                    curTokenEndCol = curTokenStartCol;
+                    curTokenRegion = std::get<3>(*std::prev(tokenList.end()));
                 }
                 else {
-                    curTokenStartLine = 0;
-                    curTokenStartCol = 0;
-                    curTokenEndLine = 0;
-                    curTokenEndCol = 0;
+                    curTokenRegion = { 0,0,0,0 };
                 }
             }
             if (newContent != '\n') {
-                ++curTokenEndCol;
+                ++curTokenRegion.end.column;
             }
             else {
-                ++curTokenEndLine;
-                curTokenEndCol = 0;
+                ++curTokenRegion.end.line;
+                curTokenRegion.end.column = 0;
             }
             tokenBuffered = true;
         }
@@ -94,16 +82,12 @@ namespace Token
         void FlushBuffer() {
             if (!curTokenContent.empty()) {
                 tokenList.push_back(std::make_tuple(
-                    curTokenContent, curTokenType, curTokenProp,
-                    curTokenStartLine, curTokenStartCol,
-                    curTokenEndLine, curTokenEndCol));
+                    curTokenContent, curTokenType,
+                    curTokenProp, curTokenRegion));
                 curTokenContent = "";
                 curTokenType = "";
                 curTokenProp = nullptr;
-                curTokenStartLine = 0;
-                curTokenStartCol = 0;
-                curTokenEndLine = 0;
-                curTokenEndCol = 0;
+                curTokenRegion = { 0,0,0,0 };
                 tokenBuffered = false;
             }
         }
@@ -156,10 +140,7 @@ namespace Token
         std::string curTokenContent;
         std::string curTokenType;
         TokenPropertyType* curTokenProp;
-        size_t curTokenStartLine;
-        size_t curTokenStartCol;
-        size_t curTokenEndLine;
-        size_t curTokenEndCol;
+        FilePosition::Region curTokenRegion;
         bool tokenBuffered;
         std::list<Token> tokenList;
     };

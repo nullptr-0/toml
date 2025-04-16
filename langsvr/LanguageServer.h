@@ -9,6 +9,7 @@
 #include <fstream>
 #include <json.hpp>
 #include "../shared/Token.h"
+#include "../shared/FilePosition.h"
 #include "../shared/DocumentTree.h"
 #include "../shared/DocTree2Toml.h"
 #include "TextEdit.h"
@@ -17,7 +18,7 @@ using json = nlohmann::json;
 
 class LanguageServer {
 public:
-    LanguageServer(const std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>>(const std::string&, bool)>& lexer, const std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>>(Token::TokenList<>& tokenList)>& parser, size_t& jsonId) : lexer(lexer), parser(parser), jsonId(jsonId) {
+    LanguageServer(const std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(const std::string&, bool)>& lexer, const std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(Token::TokenList<>& tokenList)>& parser, size_t& jsonId) : lexer(lexer), parser(parser), jsonId(jsonId) {
     }
 
     json handleRequest(const json& request) {
@@ -99,8 +100,8 @@ protected:
     bool isServerExited = false;
     bool clientSupportsMultilineToken = false;
     std::string traceValue;
-    std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>>(const std::string&, bool)> lexer;
-    std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>>(Token::TokenList<>& tokenList)> parser;
+    std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(const std::string&, bool)> lexer;
+    std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(Token::TokenList<>& tokenList)> parser;
     std::unordered_map<std::string, std::string> documentCache;
 
     json genRequest(const std::string& method, const json& params) {
@@ -218,26 +219,26 @@ protected:
         return json::object();
     }
 
-    json genDiagnosticsFromErrorWarningList(const std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>& errors, const std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>& warnings) {
+    json genDiagnosticsFromErrorWarningList(const std::vector<std::tuple<std::string, FilePosition::Region>>& errors, const std::vector<std::tuple<std::string, FilePosition::Region>>& warnings) {
         json diagnostics = json::array();
         for (const auto& error : errors) {
-            auto [message, startLine, startCol, endLine, endCol] = error;
+            auto [message, region] = error;
             json diag;
-            diag["range"]["start"]["line"] = startLine;
-            diag["range"]["start"]["character"] = startCol;
-            diag["range"]["end"]["line"] = endLine;
-            diag["range"]["end"]["character"] = endCol;
+            diag["range"]["start"]["line"] = region.start.line.getValue();
+            diag["range"]["start"]["character"] = region.start.column.getValue();
+            diag["range"]["end"]["line"] = region.end.line.getValue();
+            diag["range"]["end"]["character"] = region.end.column.getValue();
             diag["message"] = message;
             diag["severity"] = 1;
             diagnostics.push_back(diag);
         }
         for (const auto& warning : warnings) {
-            auto [message, startLine, startCol, endLine, endCol] = warning;
+            auto [message, region] = warning;
             json diag;
-            diag["range"]["start"]["line"] = startLine;
-            diag["range"]["start"]["character"] = startCol;
-            diag["range"]["end"]["line"] = endLine;
-            diag["range"]["end"]["character"] = endCol;
+            diag["range"]["start"]["line"] = region.start.line.getValue();
+            diag["range"]["start"]["character"] = region.start.column.getValue();
+            diag["range"]["end"]["line"] = region.end.line.getValue();
+            diag["range"]["end"]["character"] = region.end.column.getValue();
             diag["message"] = message;
             diag["severity"] = 2;
             diagnostics.push_back(diag);
@@ -251,8 +252,8 @@ protected:
             throw std::runtime_error("Document not found");
         }
 
-        std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> errors;
-        std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> warnings;
+        std::vector<std::tuple<std::string, FilePosition::Region>> errors;
+        std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
         auto [tokenList, lexErrors, lexWarnings] = lexer(it->second, clientSupportsMultilineToken);
         auto [docTree, parseErrors, parseWarnings] = parser(tokenList);
         errors.insert(errors.end(), lexErrors.begin(), lexErrors.end());
@@ -301,14 +302,8 @@ protected:
         }
 
         // Get tokens with positions
-        std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> errors;
-        std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> warnings;
         auto [tokenList, lexErrors, lexWarnings] = lexer(it->second, clientSupportsMultilineToken);
         auto [docTree, parseErrors, parseWarnings] = parser(tokenList);
-        errors.insert(errors.end(), lexErrors.begin(), lexErrors.end());
-        errors.insert(errors.end(), parseErrors.begin(), parseErrors.end());
-        warnings.insert(warnings.end(), lexWarnings.begin(), lexWarnings.end());
-        warnings.insert(warnings.end(), parseWarnings.begin(), parseWarnings.end());
         auto tokens = tokenList.GetTokenList();
 
         std::vector<size_t> data;
@@ -316,19 +311,19 @@ protected:
         size_t prevChar = 0;
 
         for (const auto& token : tokens) {
-            auto [content, type, prop, startLine, startCol, endLine, endCol] = token;
+            auto [content, type, prop, region] = token;
 
             // Calculate delta positions
-            size_t deltaLine = startLine - prevLine;
-            size_t deltaChar = (deltaLine == 0) ? startCol - prevChar : startCol;
+            size_t deltaLine = region.start.line.getValue() - prevLine;
+            size_t deltaChar = (deltaLine == 0) ? region.start.column.getValue() - prevChar : region.start.column.getValue();
 
-            size_t length = endCol - startCol;
+            size_t length = content.length();
             size_t tokenType = getTokenTypeIndex(type, prop);
 
             data.insert(data.end(), { deltaLine, deltaChar, length, tokenType, 0 });
 
-            prevLine = startLine;
-            prevChar = startCol;
+            prevLine = region.start.line.getValue();
+            prevChar = region.start.column.getValue();
         }
 
         delete docTree;

@@ -18,10 +18,10 @@
 BlockingStdinStream cbin;
 #endif
 
-extern std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>> lexerMain(std::istream& inputCode, bool multilineToken = true);
-extern std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>> rdparserMain(Token::TokenList<>& tokenList);
+extern std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> lexerMain(std::istream& inputCode, bool multilineToken = true);
+extern std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> rdparserMain(Token::TokenList<>& tokenList);
 
-extern int langSvrMain(std::istream& inChannel, std::ostream& outChannel, const std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>>(const std::string&, bool)>& lexer, const std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>>(Token::TokenList<>& tokenList)>& parser);
+extern int langSvrMain(std::istream& inChannel, std::ostream& outChannel, const std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(const std::string&, bool)>& lexer, const std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(Token::TokenList<>& tokenList)>& parser);
 
 //#define DEBUG
 
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
             << argVector[0] << " -h\n";
     };
     if (argc >= 3 && argVector[1] == "--langsvr") {
-        auto lexer = [](const std::string& input, bool multilineToken) -> std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>> {
+        auto lexer = [](const std::string& input, bool multilineToken) -> std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> {
             std::istringstream stream(input);
             return lexerMain(stream, multilineToken);
         };
@@ -175,8 +175,8 @@ int main(int argc, char* argv[]) {
             try {
 #endif // DEBUG
                 auto inputStream = getStreamForDiskFile(inputPath, std::ios::in);
-                std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> errors;
-                std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> warnings;
+                std::vector<std::tuple<std::string, FilePosition::Region>> errors;
+                std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
                 auto [tokenList, lexErrors, lexWarnings] = lexerMain(*inputStream, true);
                 auto [docTree, parseErrors, parseWarnings] = rdparserMain(tokenList);
                 errors.insert(errors.end(), lexErrors.begin(), lexErrors.end());
@@ -189,13 +189,15 @@ int main(int argc, char* argv[]) {
                 if (errors.size()) {
                     std::cerr << "\nErrors in " << inputPath << ":\n";
                     for (const auto& error : errors) {
-                        std::cerr << "Error (line " << std::get<1>(error) << ", col " << std::get<2>(error) << "): " << std::get<0>(error) << "\n";
+                        auto errorStart = std::get<1>(error).start;
+                        std::cerr << "Error (line " << errorStart.line << ", col " << errorStart.column << "): " << std::get<0>(error) << "\n";
                     }
                 }
                 if (warnings.size()) {
                     std::cerr << "\nWarnings in " << inputPath << ":\n";
                     for (const auto& warning : warnings) {
-                        std::cerr << "Warning (line " << std::get<1>(warning) << ", col " << std::get<2>(warning) << "): " << std::get<0>(warning) << "\n";
+                        auto warningStart = std::get<1>(warning).start;
+                        std::cerr << "Warning (line " << warningStart.line << ", col " << warningStart.column << "): " << std::get<0>(warning) << "\n";
                     }
                 }
 

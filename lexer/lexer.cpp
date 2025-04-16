@@ -5,10 +5,11 @@
 #include <regex>
 #include "../shared/CheckFunctions.h"
 #include "../shared/Token.h"
+#include "../shared/FilePosition.h"
 
-std::pair<size_t, size_t> getEndPosition(const std::string& text, size_t startLine, size_t startCol) {
-    size_t line = startLine;
-    size_t col = startCol;
+FilePosition::Position getEndPosition(const std::string& text, const FilePosition::Position& start) {
+    auto line = start.line;
+    auto col = start.column;
 
     for (char ch : text) {
         if (ch == '\n') {
@@ -192,23 +193,23 @@ bool isStringContentValid(const std::string& stringToCheck, int stringType) {
     return true;
 }
 
-std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>> lexerMain(std::istream& inputCode, bool multilineToken = true)
+std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> lexerMain(std::istream& inputCode, bool multilineToken = true)
 {
     Token::TokenList<> tokenList;
-    std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> errors;
-    std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> warnings;
+    std::vector<std::tuple<std::string, FilePosition::Region>> errors;
+    std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
     std::string codeToProcess;
-    size_t currentLine = 0;
-    size_t currentCol = 0;
+    FilePosition::Position currentPosition = { 0, 0 };
     std::string curLine;
     bool isContinued = false;
     while (std::getline(inputCode, curLine)) {
         if (std::regex_match(curLine, std::regex(R"(\s*)"))) {
             if (std::regex_search(curLine, std::regex(R"(\r(?!\n))"))) {
-                errors.push_back({ "Line ending is not valid.", currentLine, 0, currentLine, curLine.size() });
+                FilePosition::Region errorRegion = { currentPosition.line, 0, currentPosition.line, curLine.size() };
+                errors.push_back({ "Line ending is not valid.", errorRegion });
             }
-            ++currentLine;
-            currentCol = 0;
+            ++currentPosition.line;
+            currentPosition.column = 0;
             if (inputCode.peek() != -1 || std::regex_match(codeToProcess, std::regex(R"(\s+)"))) {
                 continue;
             }
@@ -226,7 +227,8 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
                 continue;
             }
             else {
-				errors.push_back({ "String literal is not closed.", currentLine, 0, currentLine, codeToProcess.find('\n')});
+                FilePosition::Region errorRegion = { currentPosition.line, 0, currentPosition.line, codeToProcess.find('\n') };
+                errors.push_back({ "String literal is not closed.", errorRegion });
             }
         }
         isContinued = false;
@@ -236,14 +238,14 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
             auto procComment = [&]() {
                 auto [tokenStartIndex, tokenContent] = CheckComment(codeToProcess);
                 if (!tokenContent.empty()) {
-                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
-                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
-                    tokenList.AddTokenToList(tokenContent, "comment", nullptr, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
-                    currentLine = tokenEndLine;
-                    currentCol = tokenEndCol;
+                    auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                    auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                    FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                    tokenList.AddTokenToList(tokenContent, "comment", nullptr, tokenRegion);
+                    currentPosition = tokenEnd;
                     codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                     if (tokenContent.find('#') >= tokenContent.size() ? false : !isStringContentValid(tokenContent.substr(tokenContent.find('#') + 1), 0)) {
-                        errors.push_back({ "Comment contains invalid content.", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+                        errors.push_back({ "Comment contains invalid content.", tokenRegion });
                     }
                     return true;
                 }
@@ -253,14 +255,14 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
             auto procString = [&]() {
                 auto [tokenType, tokenStartIndex, tokenContent] = CheckStringLiteral(codeToProcess);
                 if (!tokenContent.empty()) {
-                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
-                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
-                    tokenList.AddTokenToList(tokenContent, "string", tokenType, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
-                    currentLine = tokenEndLine;
-                    currentCol = tokenEndCol;
+                    auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                    auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                    FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                    tokenList.AddTokenToList(tokenContent, "string", tokenType, tokenRegion);
+                    currentPosition = tokenEnd;
                     codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                     if (!isStringContentValid(tokenContent, ((Type::String*)tokenType)->getType())) {
-                        errors.push_back({ "String literal contains invalid content.", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+                        errors.push_back({ "String literal contains invalid content.", tokenRegion });
                     }
                     return true;
                 }
@@ -286,11 +288,11 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
             {
                 auto [tokenType, tokenStartIndex, tokenContent] = CheckDateTimeLiteral(codeToProcess);
                 if (!tokenContent.empty()) {
-                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
-                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
-                    tokenList.AddTokenToList(tokenContent, "datetime", tokenType, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
-                    currentLine = tokenEndLine;
-                    currentCol = tokenEndCol;
+                    auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                    auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                    FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                    tokenList.AddTokenToList(tokenContent, "datetime", tokenType, tokenRegion);
+                    currentPosition = tokenEnd;
                     codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                     continue;
                 }
@@ -299,17 +301,17 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
             {
                 auto [tokenType, tokenStartIndex, tokenContent] = CheckNumericLiteral(codeToProcess);
                 if (!tokenContent.empty()) {
-                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
-                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
-                    tokenList.AddTokenToList(tokenContent, "number", tokenType, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
-                    currentLine = tokenEndLine;
-                    currentCol = tokenEndCol;
+                    auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                    auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                    FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                    tokenList.AddTokenToList(tokenContent, "number", tokenType, tokenRegion);
+                    currentPosition = tokenEnd;
                     codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                     if (tokenContent.size() > 3 && (tokenContent[0] == '+' || tokenContent[0] == '-') && tokenContent[1] == '0' && (tokenContent[2] == 'b' || tokenContent[2] == 'o' || tokenContent[2] == 'x')) {
-                        errors.push_back({ "Number literal in hexadecimal, octal or binary cannot have a positive or negative sign.", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+                        errors.push_back({ "Number literal in hexadecimal, octal or binary cannot have a positive or negative sign.", tokenRegion });
                     }
                     if (!isNumberReasonablyGrouped(tokenContent)) {
-                        warnings.push_back({ "Number literal is not grouped reasonably.", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+                        warnings.push_back({ "Number literal is not grouped reasonably.", tokenRegion });
                     }
                     continue;
                 }
@@ -318,11 +320,11 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
             {
                 auto [tokenType, tokenStartIndex, tokenContent] = CheckBooleanLiteral(codeToProcess);
                 if (!tokenContent.empty()) {
-                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
-                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
-                    tokenList.AddTokenToList(tokenContent, "boolean", new Type::Boolean(), tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
-                    currentLine = tokenEndLine;
-                    currentCol = tokenEndCol;
+                    auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                    auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                    FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                    tokenList.AddTokenToList(tokenContent, "boolean", new Type::Boolean(), tokenRegion);
+                    currentPosition = tokenEnd;
                     codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                     continue;
                 }
@@ -331,11 +333,11 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
             {
                 auto [tokenStartIndex, tokenContent] = CheckIdentifier(codeToProcess);
                 if (!tokenContent.empty()) {
-                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
-                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
-                    tokenList.AddTokenToList(tokenContent, "identifier", nullptr, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
-                    currentLine = tokenEndLine;
-                    currentCol = tokenEndCol;
+                    auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                    auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                    FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                    tokenList.AddTokenToList(tokenContent, "identifier", nullptr, tokenRegion);
+                    currentPosition = tokenEnd;
                     codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                     continue;
                 }
@@ -344,11 +346,11 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
             {
                 auto [tokenStartIndex, tokenContent] = CheckPunctuator(codeToProcess);
                 if (!tokenContent.empty()) {
-                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
-                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
-                    tokenList.AddTokenToList(tokenContent, "punctuator", nullptr, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
-                    currentLine = tokenEndLine;
-                    currentCol = tokenEndCol;
+                    auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                    auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                    FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                    tokenList.AddTokenToList(tokenContent, "punctuator", nullptr, tokenRegion);
+                    currentPosition = tokenEnd;
                     codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                     continue;
                 }
@@ -357,20 +359,19 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
             {
                 auto [tokenStartIndex, tokenContent] = CheckOperator(codeToProcess);
                 if (!tokenContent.empty()) {
-                    auto [tokenStartLine, tokenStartCol] = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentLine, currentCol);
-                    auto [tokenEndLine, tokenEndCol] = getEndPosition(tokenContent, tokenStartLine, tokenStartCol);
-                    tokenList.AddTokenToList(tokenContent, "operator", nullptr, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol);
-                    currentLine = tokenEndLine;
-                    currentCol = tokenEndCol;
+                    auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                    auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                    FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                    tokenList.AddTokenToList(tokenContent, "operator", nullptr, tokenRegion);
+                    currentPosition = tokenEnd;
                     codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                     continue;
                 }
             }
 
             if (std::regex_match(codeToProcess, std::regex(R"(\s*)"))) {
-                auto [tokenEndLine, tokenEndCol] = getEndPosition(codeToProcess, currentLine, currentCol);
-                currentLine = tokenEndLine;
-                currentCol = tokenEndCol;
+                auto tokenEnd = getEndPosition(codeToProcess, currentPosition);
+                currentPosition = tokenEnd;
                 codeToProcess.clear();
                 continue;
             }
@@ -381,22 +382,22 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_
             }
             tokenList.AppendBufferedToken(codeToProcess[0]);
             if (codeToProcess[0] == '\n') {
-                ++currentLine;
-                currentCol = 0;
+                ++currentPosition.line;
+                currentPosition.column = 0;
             }
             else {
-                ++currentCol;
+                ++currentPosition.column;
             }
             codeToProcess.erase(0, 1);
         }
         tokenList.FlushBuffer();
-        ++currentLine;
-        currentCol = 0;
+        ++currentPosition.line;
+        currentPosition.column = 0;
     }
     for (const auto& token : tokenList) {
-        auto [tokenContent, tokenType, tokenProp, tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol] = token;
+        auto [tokenContent, tokenType, tokenProp, tokenRegion] = token;
         if (tokenType == "unknown") {
-            errors.push_back({ "Unknown token: " + tokenContent + ".", tokenStartLine, tokenStartCol, tokenEndLine, tokenEndCol });
+            errors.push_back({ "Unknown token: " + tokenContent + ".", tokenRegion });
         }
     }
     return { tokenList, errors, warnings };

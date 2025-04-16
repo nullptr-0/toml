@@ -7,8 +7,8 @@
 #include "shared/Dump.h"
 #include "shared/DocTree2Json.h"
 
-extern std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>> lexerMain(std::istream& inputCode, bool multilineToken = true);
-extern std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>> rdparserMain(Token::TokenList<>& tokenList);
+extern std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> lexerMain(std::istream& inputCode, bool multilineToken = true);
+extern std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> rdparserMain(Token::TokenList<>& tokenList);
 
 //#define DEBUG
 
@@ -58,8 +58,8 @@ int main(int argc, char* argv[])
 #ifndef DEBUG
         try {
 #endif // DEBUG
-            std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> errors;
-            std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>> warnings;
+            std::vector<std::tuple<std::string, FilePosition::Region>> errors;
+            std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
             auto [tokenList, lexErrors, lexWarnings] = lexerMain(*inputStream, true);
             auto [docTree, parseErrors, parseWarnings] = rdparserMain(tokenList);
             errors.insert(errors.end(), lexErrors.begin(), lexErrors.end());
@@ -72,13 +72,15 @@ int main(int argc, char* argv[])
             if (errors.size()) {
                 std::cerr << "\nErrors in " << inputPath << ":\n";
                 for (const auto& error : errors) {
-                    std::cerr << "Error (line " << std::get<1>(error) << ", col " << std::get<2>(error) << "): " << std::get<0>(error) << "\n";
+                    auto errorStart = std::get<1>(error).start;
+                    std::cerr << "Error (line " << errorStart.line << ", col " << errorStart.column << "): " << std::get<0>(error) << "\n";
                 }
             }
             if (warnings.size()) {
                 std::cerr << "\nWarnings in " << inputPath << ":\n";
                 for (const auto& warning : warnings) {
-                    std::cerr << "Warning (line " << std::get<1>(warning) << ", col " << std::get<2>(warning) << "): " << std::get<0>(warning) << "\n";
+                    auto warningStart = std::get<1>(warning).start;
+                    std::cerr << "Warning (line " << warningStart.line << ", col " << warningStart.column << "): " << std::get<0>(warning) << "\n";
                 }
             }
 #endif // DEBUG

@@ -85,7 +85,7 @@ void writeLSPContent(std::ostream& stream, const std::string& content) {
     stream.flush();
 }
 
-int langSvrMain(std::istream& inChannel, std::ostream& outChannel, const std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>>(const std::string&, bool)>& lexer, const std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>, std::vector<std::tuple<std::string, size_t, size_t, size_t, size_t>>>(Token::TokenList<>& tokenList)>& parser) {
+int langSvrMain(std::istream& inChannel, std::ostream& outChannel, const std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(const std::string&, bool)>& lexer, const std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(Token::TokenList<>& tokenList)>& parser) {
     size_t jsonId = 0;
     LanguageServer server(lexer, parser, jsonId);
     int serverExitCode = -1;
