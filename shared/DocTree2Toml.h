@@ -92,6 +92,7 @@ namespace DocTree {
                 if (!elem) continue;
                 Table* tableElem = static_cast<Table*>(elem);
                 std::string arrayScope = currentScope.empty() ? key : currentScope + "." + key;
+                if (os.tellp() != 0) os << "\n";
                 os << getIndent(indent) << "[[" << arrayScope << "]]\n";
                 processTable(tableElem, os, arrayScope, indent + 1);
             }
@@ -138,6 +139,7 @@ namespace DocTree {
             if (auto* tableValue = dynamic_cast<Table*>(valueNode)) {
                 if (tableValue->getIsExplicitlyDefined()) {
                     std::string newScope = currentScope.empty() ? id : currentScope + "." + id;
+                    if (os.tellp() != 0) os << "\n";
                     os << getIndent(indent) << "[" << newScope << "]\n";
                     processTable(tableValue, os, newScope, indent);
                 }
