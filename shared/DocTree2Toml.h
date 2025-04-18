@@ -17,7 +17,7 @@ namespace DocTree {
 #else
     void processInlineTable(Table* table, std::ostream& os, int indent = 0);
     void processInlineArray(Array* array, std::ostream& os, int indent = 0);
-    void processTable(Table* table, std::ostream& os, const std::string& current_scope, int indent = 0);
+    void processTable(Table* table, std::ostream& os, const std::string& currentScope, int indent = 0);
 
     std::string getIndent(int level) {
         return std::string(level * 2, ' '); // 2 spaces per indent level
@@ -79,7 +79,7 @@ namespace DocTree {
         os << " ]";
     }
 
-    void processArray(const std::string& key, Array* array, std::ostream& os, const std::string& current_scope, int indent) {
+    void processArray(const std::string& key, Array* array, std::ostream& os, const std::string& currentScope, int indent) {
         const auto& elems = array->getElems();
         bool isArrayOfTables = std::all_of(elems.begin(), elems.end(), [](const auto& elem) {
             if (!elem) return false;
@@ -91,9 +91,9 @@ namespace DocTree {
             for (const auto& elem : elems) {
                 if (!elem) continue;
                 Table* tableElem = static_cast<Table*>(elem);
-                std::string array_scope = current_scope.empty() ? key : current_scope + "." + key;
-                os << getIndent(indent) << "[[" << array_scope << "]]\n";
-                processTable(tableElem, os, array_scope, indent + 1);
+                std::string arrayScope = currentScope.empty() ? key : currentScope + "." + key;
+                os << getIndent(indent) << "[[" << arrayScope << "]]\n";
+                processTable(tableElem, os, arrayScope, indent + 1);
             }
         }
         else {
@@ -103,7 +103,7 @@ namespace DocTree {
         }
     }
 
-    void processTable(Table* table, std::ostream& os, const std::string& current_scope, int indent) {
+    void processTable(Table* table, std::ostream& os, const std::string& currentScope, int indent) {
         const auto& elems = table->getElems();
         std::vector<std::string> keys;
         for (const auto& [key, _] : elems) keys.push_back(key);
@@ -123,7 +123,7 @@ namespace DocTree {
                     os << id << " = " << valStr << "\n";
                 }
                 else if (auto* array = dynamic_cast<Array*>(valueNode)) {
-                    processArray(id, array, os, current_scope, indent);
+                    processArray(id, array, os, currentScope, indent);
                 }
             }
         }
@@ -137,9 +137,9 @@ namespace DocTree {
 
             if (auto* tableValue = dynamic_cast<Table*>(valueNode)) {
                 if (tableValue->getIsExplicitlyDefined()) {
-                    std::string new_scope = current_scope.empty() ? id : current_scope + "." + id;
-                    os << getIndent(indent) << "[" << new_scope << "]\n";
-                    processTable(tableValue, os, new_scope, indent);
+                    std::string newScope = currentScope.empty() ? id : currentScope + "." + id;
+                    os << getIndent(indent) << "[" << newScope << "]\n";
+                    processTable(tableValue, os, newScope, indent);
                 }
                 else {
                     os << getIndent(indent) << id << " = ";
