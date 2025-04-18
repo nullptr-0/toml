@@ -75,6 +75,9 @@ public:
                     else if (request["method"] == "textDocument/completion") {
                         return handleCompletion(request);
                     }
+                    else if (request["method"] == "textDocument/hover") {
+                        return handleHover(request);
+                    }
                     else if (request["method"] == "textDocument/diagnostic") {
                         return handlePullDiagnostic(request);
                     }
@@ -174,6 +177,7 @@ protected:
                            "triggerCharacters": [".", "-"],
                            "allCommitCharacters": [".", "=", " ", "\"", "'", "]", "}"]
                         },
+                       "hoverProvider": true,
                        "diagnosticProvider": {
                            "interFileDependencies": true,
                            "workspaceDiagnostics": false
@@ -574,6 +578,63 @@ protected:
         return genResponse(
             request["id"].get<size_t>(),
             result,
+            json()
+        );
+    }
+
+    json handleHover(const json& request) {
+        const auto& uri = request["params"]["textDocument"]["uri"].get<std::string>();
+        auto it = documentCache.find(uri);
+        if (it == documentCache.end()) {
+            throw std::runtime_error("Document not found");
+        }
+        FilePosition::Position position = { { request["params"]["position"]["line"].get<size_t>(), false }, { request["params"]["position"]["character"].get<size_t>(), false } };
+        auto [tokenList, lexErrors, lexWarnings] = lexer(it->second, clientSupportsMultilineToken);
+        auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = parser(tokenList);
+        auto hover = json::object();
+        for (auto tokenListIterator = tokenList.begin(); tokenListIterator != tokenList.end(); ++tokenListIterator) {
+            const auto& token = *tokenListIterator;
+            const auto tokenRange = std::get<3>(token);
+            if (tokenRange.contains(position)) {
+                auto tokenIndex = std::distance(tokenList.begin(), tokenListIterator);
+                if (tokenDocTreeMapping.find(tokenIndex) == tokenDocTreeMapping.end()) {
+                    continue;
+                }
+                auto targetKey = tokenDocTreeMapping[std::distance(tokenList.begin(), tokenListIterator)];
+                if (auto table = dynamic_cast<DocTree::Table*>(std::get<1>(targetKey->get()))) {
+                    auto [elems, isMutable, defPos, isExplicitlyDefined] = table->get();
+                    std::string markdown = "## **Table** " + std::get<0>(targetKey->get()) + "\n";
+                    markdown += "- **Mutability**: " + std::string(isMutable ? "mutable" : "immutable") + "\n";
+                    markdown += "- **Explicitly Defined**: " + std::string(isExplicitlyDefined ? "Yes" : "No") + "\n";
+                    markdown += "- **Entries**: " + std::to_string(elems.size()) + "\n";
+                    markdown += "- **Defined At**: ln " + std::to_string(defPos.start.line.getValue() + 1) + ", col " + std::to_string(defPos.start.column.getValue() + 1);
+                    hover["contents"]["kind"] = "markdown";
+                    hover["contents"]["value"] = markdown;
+                    hover["range"]["start"]["line"] = tokenRange.start.line.getValue();
+                    hover["range"]["start"]["character"] = tokenRange.start.column.getValue();
+                    hover["range"]["end"]["line"] = tokenRange.end.line.getValue();
+                    hover["range"]["end"]["character"] = tokenRange.end.column.getValue();
+                }
+                else if (auto array = dynamic_cast<DocTree::Array*>(std::get<1>(targetKey->get()))) {
+                    auto [elems, isMutable, defPos] = array->get();
+                    std::string markdown = "## **Array** " + std::get<0>(targetKey->get()) + "\n";
+                    markdown += "- **Mutability**: " + std::string(isMutable ? "mutable" : "immutable") + "\n";
+                    markdown += "- **Entries**: " + std::to_string(elems.size()) + "\n";
+                    markdown += "- **Defined At**: ln " + std::to_string(defPos.start.line.getValue() + 1) + ", col " + std::to_string(defPos.start.column.getValue() + 1);
+                    hover["contents"]["kind"] = "markdown";
+                    hover["contents"]["value"] = markdown;
+                    hover["range"]["start"]["line"] = tokenRange.start.line.getValue();
+                    hover["range"]["start"]["character"] = tokenRange.start.column.getValue();
+                    hover["range"]["end"]["line"] = tokenRange.end.line.getValue();
+                    hover["range"]["end"]["character"] = tokenRange.end.column.getValue();
+                }
+            }
+        }
+        delete docTree;
+        tokenList.clear();
+        return genResponse(
+            request["id"].get<size_t>(),
+            hover,
             json()
         );
     }
