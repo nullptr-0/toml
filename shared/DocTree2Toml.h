@@ -34,7 +34,7 @@ namespace DocTree {
         for (const auto& key : keys) {
             auto* keyNode = elems.at(key);
             if (!keyNode) continue;
-            const auto& [id, valueNode] = keyNode->get();
+            const auto& [id, valueNode, parentTable] = keyNode->get();
             if (!valueNode) continue;
 
             if (!first) os << ", ";
@@ -113,7 +113,7 @@ namespace DocTree {
         for (const auto& key : keys) {
             auto* keyNode = elems.at(key);
             if (!keyNode) continue;
-            const auto& [id, valueNode] = keyNode->get();
+            const auto& [id, valueNode, parentTable] = keyNode->get();
             if (!valueNode) continue;
 
             if (dynamic_cast<Value*>(valueNode) || dynamic_cast<Array*>(valueNode)) {
@@ -132,7 +132,7 @@ namespace DocTree {
         for (const auto& key : keys) {
             auto* keyNode = elems.at(key);
             if (!keyNode) continue;
-            const auto& [id, valueNode] = keyNode->get();
+            const auto& [id, valueNode, parentTable] = keyNode->get();
             if (!valueNode) continue;
 
             if (auto* tableValue = dynamic_cast<Table*>(valueNode)) {

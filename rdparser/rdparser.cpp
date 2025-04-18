@@ -131,9 +131,10 @@ public:
                         if (type == ParsedKeyType::Key && headerDefinedTables.find(curTable) != headerDefinedTables.end() && lastDefinedTable != curTable) {
                             errors.push_back({ "Parent table is already defined.", std::get<3>(*position) });
                         }
-                        auto newKey = new DocTree::Key(curIdentifier, new DocTree::Table({}, true, std::get<3>(*position), type == ParsedKeyType::Key));
+                        auto newKey = new DocTree::Key(curIdentifier, new DocTree::Table({}, true, std::get<3>(*position), type == ParsedKeyType::Key), curTable);
                         curTable->addElem(newKey);
                         curTable = (DocTree::Table*)std::get<1>(newKey->get());
+                        tokenDocTreeMapping[std::distance(input.begin(), position)] = newKey;
                     }
                     else {
                         auto curKeyValue = std::get<1>(keyIter->second->get());
@@ -155,6 +156,7 @@ public:
                         else {
                             errors.push_back({ "Key " + curIdentifier + " is defined as a bare key.", std::get<3>(*position) });
                         }
+                        tokenDocTreeMapping[std::distance(input.begin(), position)] = keyIter->second;
                     }
                 }
                 else {
@@ -163,7 +165,7 @@ public:
                         if (type == ParsedKeyType::Key && headerDefinedTables.find(curTable) != headerDefinedTables.end() && lastDefinedTable != curTable) {
                             errors.push_back({ "Parent table is already defined.", std::get<3>(*position) });
                         }
-                        auto newKey = new DocTree::Key(curIdentifier, nullptr);
+                        auto newKey = new DocTree::Key(curIdentifier, nullptr, curTable);
                         curTable->addElem(newKey);
                         if (type == ParsedKeyType::Array) {
                             lastDefinedTable = new DocTree::Table({}, true, std::get<3>(*position), true);
@@ -175,6 +177,7 @@ public:
                             headerDefinedTables.insert(lastDefinedTable);
                         }
                         targetKey = newKey;
+                        tokenDocTreeMapping[std::distance(input.begin(), position)] = newKey;
                     }
                     else {
                         if (type == ParsedKeyType::Array) {
@@ -213,6 +216,7 @@ public:
                         else {
                             errors.push_back({ "Key " + curIdentifier + " is already defined.", std::get<3>(*position) });
                         }
+                        tokenDocTreeMapping[std::distance(input.begin(), position)] = keyIter->second;
                     }
                 }
                 ++position;
@@ -334,7 +338,6 @@ public:
         do {
             if (std::get<0>(*position) == "[") {
                 squareParenStack.push(std::get<3>(*position));
-                auto arrayDefStart = std::get<3>(*position).start;
                 ++position;
                 parsedValue = new DocTree::Array({}, false, {});
                 while (position != input.end() && std::get<0>(*position) != "]") {
@@ -355,10 +358,6 @@ public:
                         errors.push_back({ "Expect an array element.", std::get<3>(*std::prev(position)) });
                     }
                 }
-                if (position != input.end() && std::get<0>(*position) == "]") {
-                    FilePosition::Region tableDefRegion = { arrayDefStart, std::get<3>(*position).end };
-                    ((DocTree::Array*)parsedValue)->set<2>(tableDefRegion);
-                }
             }
             else if (std::get<0>(*position) == "{") {
                 curlParenStack.push(std::get<3>(*position));
@@ -375,7 +374,7 @@ public:
                         errors.push_back({ "Expect a key-value pair.", std::get<3>(*std::prev(position)) });
                     }
                     else {
-                        auto [keyId, keyValue] = parsedKey->get();
+                        auto [keyId, keyValue, keyParentTable] = parsedKey->get();
                         if (dynamic_cast<DocTree::Array*>(keyValue) || dynamic_cast<DocTree::Table*>(keyValue)) {
                             allowMultiLine = true;
                         }
@@ -404,7 +403,6 @@ public:
                         errors.push_back({ "A terminating comma is not permitted after the last key-value pair in an inline table.", std::get<3>(*std::prev(position)) });
                     }
                     FilePosition::Region tableDefRegion = { tableDefStart, tableDefEnd };
-                    ((DocTree::Table*)parsedValue)->set<2>(tableDefRegion);
                     if (!allowMultiLine && tableDefEnd.line != tableDefStart.line) {
                         errors.push_back({ "All parts of the inline table definition should be in the same line.", tableDefRegion });
                     }
@@ -469,6 +467,7 @@ public:
                     errors.push_back({ "Expect an assignment.", position == input.begin() ? FilePosition::Region{ 0, 0, 0, 0 } : std::get<3>(*std::prev(position)) });
                 }
                 else {
+                    auto keyDefPos = std::get<3>(*std::prev(position));
                     if (std::get<0>(*position) != "=") {
                         errors.push_back({ "Expect =. Got " + std::get<0>(*position) + ".", std::get<3>(*position) });
                     }
@@ -484,6 +483,12 @@ public:
                     auto value = ParseValue();
                     if (value) {
                         ((DocTree::Key*)targetKey)->set<1>(value);
+                        if (auto arrayValue = dynamic_cast<DocTree::Array*>(value)) {
+                            arrayValue->set<2>(keyDefPos);
+                        }
+                        else if (auto tableValue = dynamic_cast<DocTree::Table*>(value)) {
+                            tableValue->set<2>(keyDefPos);
+                        }
                     }
                     else {
                         errors.push_back({ "Expect a value for the assignment.", std::get<3>(*std::prev(position)) });
@@ -512,6 +517,10 @@ public:
         return docTree;
     }
 
+    std::unordered_map<size_t, DocTree::Key*> GetTokenDocTreeMapping() {
+        return tokenDocTreeMapping;
+    }
+
     std::vector<std::tuple<std::string, FilePosition::Region>> GetErrors() {
         return errors;
     }
@@ -523,13 +532,14 @@ public:
 protected:
     Token::TokenList<>& input;
     Token::TokenList<>::iterator position;
+    std::unordered_map<size_t, DocTree::Key*> tokenDocTreeMapping;
     DocTree::Table* docTree;
     DocTree::Table* lastDefinedTable;
     std::vector<std::tuple<std::string, FilePosition::Region>> errors;
     std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
 };
 
-std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> rdparserMain(Token::TokenList<>& tokenList) {
+std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::unordered_map<size_t, DocTree::Key*>> rdparserMain(Token::TokenList<>& tokenList) {
     RecursiveDescentParser rdparser(tokenList);
-    return { rdparser.ParseDocument(), rdparser.GetErrors(), rdparser.GetWarnings() };
+    return { rdparser.ParseDocument(), rdparser.GetErrors(), rdparser.GetWarnings(), rdparser.GetTokenDocTreeMapping() };
 }

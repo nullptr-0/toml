@@ -113,9 +113,11 @@ namespace DocTree
         FilePosition::Region defPos;
     };
 
+    class Table;
+
     class Key : public DocTreeNode {
     public:
-        Key(std::string id, DocTreeNode* value) : id(id), value(value) {}
+        Key(std::string id, DocTreeNode* value, Table* parentTable) : id(id), value(value), parentTable(parentTable) {}
 
         ~Key() {
             if (value) {
@@ -123,8 +125,8 @@ namespace DocTree
             }
         }
 
-        std::tuple<std::string, DocTreeNode*> get() const {
-            return std::make_tuple(id, value);
+        std::tuple<std::string, DocTreeNode*, Table*> get() const {
+            return std::make_tuple(id, value, parentTable);
         }
 
         template <int N>
@@ -135,6 +137,9 @@ namespace DocTree
             else if constexpr (N == 1) {
                 get_any_val(DocTreeNode*, this->value)
             }
+            else if constexpr (N == 2) {
+                get_any_val(Table*, this->parentTable)
+            }
             else {
                 throw std::invalid_argument("Invalid setter index");
             }
@@ -143,6 +148,7 @@ namespace DocTree
     protected:
         std::string id;
         DocTreeNode* value;
+        Table* parentTable;
     };
 
     class Table : public DocTreeNode {

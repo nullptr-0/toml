@@ -13,15 +13,20 @@
 #include "../shared/DocumentTree.h"
 #include "../shared/DocTree2Toml.h"
 #include "TextEdit.h"
+#include "FindPairs.h"
 
 using json = nlohmann::json;
 
 class LanguageServer {
 public:
-    LanguageServer(const std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(const std::string&, bool)>& lexer, const std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(Token::TokenList<>& tokenList)>& parser, size_t& jsonId) : lexer(lexer), parser(parser), jsonId(jsonId) {
+    LanguageServer(const std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(const std::string&, bool)>& lexer, const std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::unordered_map<size_t, DocTree::Key*>>(Token::TokenList<>& tokenList)>& parser, size_t& jsonId) : lexer(lexer), parser(parser), jsonId(jsonId) {
     }
 
     json handleRequest(const json& request) {
+        size_t requestId = 0;
+        if (request.contains("id")) {
+            requestId = request["id"];
+        }
         try {
             if (request["method"] == "initialize") {
                 return handleInitialize(request);
@@ -64,15 +69,20 @@ public:
                     else if (request["method"] == "textDocument/formatting") {
                         return handleFormatting(request);
                     }
+                    else if (request["method"] == "textDocument/definition") {
+                        return handleDefinition(request);
+                    }
+                    else if (request["method"] == "textDocument/completion") {
+                        return handleCompletion(request);
+                    }
                     else if (request["method"] == "textDocument/diagnostic") {
                         return handlePullDiagnostic(request);
                     }
                     json error;
                     error["jsonrpc"] = "2.0";
-                    error["id"] = jsonId;
+                    error["id"] = requestId;
                     error["error"]["error"] = -32601;
                     error["error"]["message"] = "Method not found";
-                    ++jsonId;
                     return error;
                 }
             }
@@ -80,10 +90,9 @@ public:
         catch (const std::exception& e) {
             json error;
             error["jsonrpc"] = "2.0";
-            error["id"] = jsonId;
+            error["id"] = requestId;
             error["error"]["error"] = -32603;
             error["error"]["message"] = e.what();
-            ++jsonId;
             return error;
         }
     }
@@ -101,7 +110,7 @@ protected:
     bool clientSupportsMultilineToken = false;
     std::string traceValue;
     std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(const std::string&, bool)> lexer;
-    std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(Token::TokenList<>& tokenList)> parser;
+    std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::unordered_map<size_t, DocTree::Key*>>(Token::TokenList<>& tokenList)> parser;
     std::unordered_map<std::string, std::string> documentCache;
 
     json genRequest(const std::string& method, const json& params) {
@@ -114,19 +123,18 @@ protected:
         return request;
     }
 
-    json genResponse(const json& result, const json& error) {
+    json genResponse(const size_t id, const json& result, const json& error) {
         json response;
         if (error.is_null()) {
             response["jsonrpc"] = "2.0";
-            response["id"] = jsonId;
+            response["id"] = id;
             response["result"] = result;
         }
         else {
             response["jsonrpc"] = "2.0";
-            response["id"] = jsonId;
+            response["id"] = id;
             response["error"] = error;
         }
-        ++jsonId;
         return response;
     }
 
@@ -146,6 +154,7 @@ protected:
         traceValue = request["params"]["trace"];
         clientSupportsMultilineToken = request["params"]["capabilities"]["textDocument"]["semanticTokens"]["multilineTokenSupport"];
         return genResponse(
+            request["id"].get<size_t>(),
             json::parse(R"({
                    "capabilities": {
                        "textDocumentSync": 1,
@@ -160,6 +169,11 @@ protected:
                            "full": true
                        },
                        "documentFormattingProvider": true,
+                       "definitionProvider": true,
+                       "completionProvider": {
+                           "triggerCharacters": [".", "-"],
+                           "allCommitCharacters": [".", "=", " ", "\"", "'", "]", "}"]
+                        },
                        "diagnosticProvider": {
                            "interFileDependencies": true,
                            "workspaceDiagnostics": false
@@ -181,6 +195,7 @@ protected:
     json handleShutdown(const json& request) {
         isServerShutdown = true;
         return genResponse(
+            request["id"].get<size_t>(),
             json(),
             json()
         );
@@ -255,7 +270,7 @@ protected:
         std::vector<std::tuple<std::string, FilePosition::Region>> errors;
         std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
         auto [tokenList, lexErrors, lexWarnings] = lexer(it->second, clientSupportsMultilineToken);
-        auto [docTree, parseErrors, parseWarnings] = parser(tokenList);
+        auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = parser(tokenList);
         errors.insert(errors.end(), lexErrors.begin(), lexErrors.end());
         errors.insert(errors.end(), parseErrors.begin(), parseErrors.end());
         warnings.insert(warnings.end(), lexWarnings.begin(), lexWarnings.end());
@@ -289,6 +304,7 @@ protected:
         result["items"] = diagnostics;
 
         return genResponse(
+            request["id"].get<size_t>(),
             result,
             json()
         );
@@ -303,7 +319,7 @@ protected:
 
         // Get tokens with positions
         auto [tokenList, lexErrors, lexWarnings] = lexer(it->second, clientSupportsMultilineToken);
-        auto [docTree, parseErrors, parseWarnings] = parser(tokenList);
+        auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = parser(tokenList);
         auto tokens = tokenList.GetTokenList();
 
         std::vector<size_t> data;
@@ -333,6 +349,7 @@ protected:
         result["data"] = data;
 
         return genResponse(
+            request["id"].get<size_t>(),
             result,
             json()
         );
@@ -356,7 +373,7 @@ protected:
         }
         // Perform formatting here
         auto [tokenList, lexErrors, lexWarnings] = lexer(it->second, clientSupportsMultilineToken);
-        auto [docTree, parseErrors, parseWarnings] = parser(tokenList);
+        auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = parser(tokenList);
         auto newToml = DocTree::toToml(docTree);
         auto edits = computeEdits(it->second, newToml);
 
@@ -381,6 +398,181 @@ protected:
         }
 
         return genResponse(
+            request["id"].get<size_t>(),
+            result,
+            json()
+        );
+    }
+
+    json handleDefinition(const json& request) {
+        const auto& uri = request["params"]["textDocument"]["uri"].get<std::string>();
+        auto it = documentCache.find(uri);
+        if (it == documentCache.end()) {
+            throw std::runtime_error("Document not found");
+        }
+        FilePosition::Position position = { { request["params"]["position"]["line"].get<size_t>(), false }, { request["params"]["position"]["character"].get<size_t>(), false } };
+        auto [tokenList, lexErrors, lexWarnings] = lexer(it->second, clientSupportsMultilineToken);
+        auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = parser(tokenList);
+		json definition = json::object();
+        for (auto tokenListIterator = tokenList.begin(); tokenListIterator != tokenList.end(); ++tokenListIterator) {
+            const auto& token = *tokenListIterator;
+            if (std::get<3>(token).contains(position)) {
+                auto tokenIndex = std::distance(tokenList.begin(), tokenListIterator);
+                if (tokenDocTreeMapping.find(tokenIndex) == tokenDocTreeMapping.end()) {
+                    continue;
+                }
+                auto targetKey = tokenDocTreeMapping[std::distance(tokenList.begin(), tokenListIterator)];
+                if (auto table = dynamic_cast<DocTree::Table*>(std::get<1>(targetKey->get()))) {
+                    auto tableRegion = std::get<2>(table->get());
+                    definition["uri"] = uri;
+                    definition["range"]["start"]["line"] = tableRegion.start.line.getValue();
+                    definition["range"]["start"]["character"] = tableRegion.start.column.getValue();
+                    definition["range"]["end"]["line"] = tableRegion.end.line.getValue();
+                    definition["range"]["end"]["character"] = tableRegion.end.column.getValue();
+                }
+                else if (auto array = dynamic_cast<DocTree::Array*>(std::get<1>(targetKey->get()))) {
+                    auto arrayRegion = std::get<2>(array->get());
+                    definition["uri"] = uri;
+                    definition["range"]["start"]["line"] = arrayRegion.start.line.getValue();
+                    definition["range"]["start"]["character"] = arrayRegion.start.column.getValue();
+                    definition["range"]["end"]["line"] = arrayRegion.end.line.getValue();
+                    definition["range"]["end"]["character"] = arrayRegion.end.column.getValue();
+                }
+            }
+        }
+        delete docTree;
+        tokenList.clear();
+        return genResponse(
+            request["id"].get<size_t>(),
+            definition,
+            json()
+        );
+    }
+
+    json handleCompletion(const json& request) {
+        const auto& uri = request["params"]["textDocument"]["uri"].get<std::string>();
+        auto it = documentCache.find(uri);
+        if (it == documentCache.end()) {
+            throw std::runtime_error("Document not found");
+        }
+        FilePosition::Position position = { { request["params"]["position"]["line"].get<size_t>(), false }, { request["params"]["position"]["character"].get<size_t>(), false } };
+        auto [tokenList, lexErrors, lexWarnings] = lexer(it->second, clientSupportsMultilineToken);
+        auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = parser(tokenList);
+        auto completions = json::array();
+        DocTree::Table* lastDefinedTable = docTree;
+        for (auto tokenListIterator = tokenList.begin(); tokenListIterator != tokenList.end(); ++tokenListIterator) {
+            const auto& token = *tokenListIterator;
+            if (std::get<1>(token) == "identifier" && std::next(tokenListIterator) != tokenList.end() && std::get<0>(*std::next(tokenListIterator)) == "]") {
+                auto lastDefinedTableKeyValue = std::get<1>(tokenDocTreeMapping[std::distance(tokenList.begin(), tokenListIterator)]->get());
+                if (dynamic_cast<DocTree::Table*>(lastDefinedTableKeyValue)) {
+                    lastDefinedTable = dynamic_cast<DocTree::Table*>(lastDefinedTableKeyValue);
+                }
+                else if (auto keyArrayValue = dynamic_cast<DocTree::Array*>(lastDefinedTableKeyValue)) {
+                    auto keyArray = std::get<0>(keyArrayValue->get());
+                    if (keyArray.size() && dynamic_cast<DocTree::Table*>(keyArray.back())) {
+                        lastDefinedTable = dynamic_cast<DocTree::Table*>(keyArray.back());
+                    }
+                }
+            }
+            if (std::get<3>(token).contains(position)) {
+                auto tokenIndex = std::distance(tokenList.begin(), tokenListIterator);
+				if (tokenDocTreeMapping.find(tokenIndex) != tokenDocTreeMapping.end() || std::get<0>(token) == ".") {
+                    std::vector<std::pair<std::string, DocTree::Key*>> completionKeyPairs;
+                    if (std::get<0>(token) == ".") {
+                        auto targetKey = tokenDocTreeMapping[std::distance(tokenList.begin(), std::prev(tokenListIterator))];
+                        auto keyValue = std::get<1>(targetKey->get());
+                        if (auto keyTableValue = dynamic_cast<DocTree::Table*>(keyValue)) {
+                            auto keyTable= std::get<0>(keyTableValue->get());
+                            for (auto& keyPair : keyTable) {
+                                completionKeyPairs.push_back(keyPair);
+                            }
+                        }
+                        else if (auto keyArrayValue = dynamic_cast<DocTree::Array*>(keyValue)) {
+                            auto keyArray = std::get<0>(keyArrayValue->get());
+                            if (keyArray.size() && dynamic_cast<DocTree::Table*>(keyArray.back())) {
+                                auto keyTableValue = dynamic_cast<DocTree::Table*>(keyArray.back());
+                                auto keyTable = std::get<0>(keyTableValue->get());
+                                for (auto& keyPair : keyTable) {
+                                    completionKeyPairs.push_back(keyPair);
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        auto targetKey = tokenDocTreeMapping[std::distance(tokenList.begin(), tokenListIterator)];
+                        auto parentTable = std::get<0>(std::get<2>(targetKey->get())->get());
+                        completionKeyPairs = findPairs(parentTable, std::get<0>(targetKey->get()));
+                        for (auto keyPairIterator = completionKeyPairs.begin(); keyPairIterator != completionKeyPairs.end(); ++keyPairIterator) {
+                            if (keyPairIterator->second == targetKey) {
+                                completionKeyPairs.erase(keyPairIterator);
+                                break;
+                            }
+                        }
+                    }
+                    for (auto& completionKeyPair : completionKeyPairs) {
+                        auto completionKeyId = std::get<0>(completionKeyPair);
+                        auto completionKeyValue = std::get<1>(std::get<1>(completionKeyPair)->get());
+                        if (auto table = dynamic_cast<DocTree::Table*>(completionKeyValue)) {
+                            auto tableRegion = std::get<2>(table->get());
+                            auto tableDefStartString = " defined at ln " + std::to_string(tableRegion.start.line.getValue() + 1) + ", col " + std::to_string(tableRegion.start.column.getValue() + 1);
+                            json completionItem;
+                            completionItem["label"] = completionKeyId;
+                            completionItem["kind"] = 6;
+                            completionItem["detail"] = "Table" + tableDefStartString;
+                            completionItem["insertText"] = completionKeyId;
+                            completions.push_back(completionItem);
+                        }
+                        else if (auto array = dynamic_cast<DocTree::Array*>(completionKeyValue)) {
+                            auto arrayRegion = std::get<2>(array->get());
+                            auto arrayDefStartString = " defined at ln " + std::to_string(arrayRegion.start.line.getValue() + 1) + ", col " + std::to_string(arrayRegion.start.column.getValue() + 1);
+                            json completionItem;
+                            completionItem["label"] = completionKeyId;
+                            completionItem["kind"] = 6;
+                            completionItem["detail"] = "Array" + arrayDefStartString;
+                            completions.push_back(completionItem);
+                        }
+                    }
+                }
+            }
+            else if (std::get<3>(token).end.line > position.line && (std::next(tokenListIterator) == tokenList.end() || std::get<3>(*std::next(tokenListIterator)).start < position)) {
+                auto keyTable = std::get<0>(lastDefinedTable->get());
+                for (auto& completionKeyPair : keyTable) {
+                    auto completionKeyId = std::get<0>(completionKeyPair);
+                    auto completionKeyValue = std::get<1>(std::get<1>(completionKeyPair)->get());
+                    if (auto table = dynamic_cast<DocTree::Table*>(completionKeyValue)) {
+                        auto tableRegion = std::get<2>(table->get());
+                        auto tableDefStartString = " defined at ln " + std::to_string(tableRegion.start.line.getValue() + 1) + ", col " + std::to_string(tableRegion.start.column.getValue() + 1);
+                        json completionItem;
+                        completionItem["label"] = completionKeyId;
+                        completionItem["kind"] = 6;
+                        completionItem["detail"] = "Table" + tableDefStartString;
+                        completionItem["insertText"] = completionKeyId;
+                        completions.push_back(completionItem);
+                    }
+                    else if (auto array = dynamic_cast<DocTree::Array*>(completionKeyValue)) {
+                        auto arrayRegion = std::get<2>(array->get());
+                        auto arrayDefStartString = " defined at ln " + std::to_string(arrayRegion.start.line.getValue() + 1) + ", col " + std::to_string(arrayRegion.start.column.getValue() + 1);
+                        json completionItem;
+                        completionItem["label"] = completionKeyId;
+                        completionItem["kind"] = 6;
+                        completionItem["detail"] = "Array" + arrayDefStartString;
+                        completions.push_back(completionItem);
+                    }
+                }
+            }
+        }
+        delete docTree;
+        tokenList.clear();
+        json result;
+        if (completions.size()) {
+            result["isIncomplete"] = false;
+            result["items"] = completions;
+        }
+        else {
+            result = json::object();
+        }
+        return genResponse(
+            request["id"].get<size_t>(),
             result,
             json()
         );

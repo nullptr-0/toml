@@ -197,7 +197,7 @@ namespace DocTree {
             const auto elemMap = std::get<0>(tableNode->get());
             for (const auto& [key, keyNode] : elemMap) {
                 if (!keyNode) continue; // Skip null Key nodes
-                auto [id, value] = keyNode->get();
+                auto [id, value, parentTable] = keyNode->get();
                 obj[id] = value ? toJson(value, isValueTagged) : json(nullptr);
             }
             return obj;
@@ -205,7 +205,7 @@ namespace DocTree {
 
         // Handle Key nodes (if encountered directly)
         if (const Key* keyNode = dynamic_cast<const Key*>(node)) {
-            auto [id, value] = keyNode->get();
+            auto [id, value, parentTable] = keyNode->get();
             json obj = json::object();
             obj[id] = value ? toJson(value, isValueTagged) : json(nullptr);
             return obj;

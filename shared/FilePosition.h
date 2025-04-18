@@ -65,6 +65,10 @@ namespace FilePosition {
             return start == other.start && end == other.end;
         }
 
+        bool contains(const Position& position) const {
+            return start <= position && position <= end;
+        }
+
         bool contains(const Region& other) const {
             return start <= other.start && other.end <= end;
         }
