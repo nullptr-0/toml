@@ -15,7 +15,7 @@ extern std::tuple<size_t, std::string> CheckIdentifier(std::string strToCheck);
 std::tuple<size_t, std::string> CheckIdentifier(std::string strToCheck) {
     size_t identifierStartIndex;
     std::string identifierContent;
-    boost::regex identifierRegex(R"((\s*)([-\w]+))");
+    boost::regex identifierRegex(R"(^(\s*)([-\w]+))");
     boost::smatch match;
     if (boost::regex_search(strToCheck, match, identifierRegex) && !match.prefix().length()) {
         identifierStartIndex = match[1].length();
@@ -38,7 +38,7 @@ std::tuple<Type::Type*, size_t, std::string> CheckNumericLiteral(std::string str
     std::string literalContent;
     boost::regex integerLiteralRegex(R"(^(\s*)([+-]?(0(?![xob])|[1-9]+(_?\d+)*|0x[\da-fA-F]+(_?[\da-fA-F]+)*|0o[0-7]+(_?[0-7]+)*|0b[01]+(_?[01]+)*)))");
     boost::regex floatLiteralRegex(R"(^(\s*)([+-]?((0(?![xob])|[1-9]+(_?\d+)*)(\.((\d+_)*\d+))?([eE][-+]?\d+(_?\d+)*)?)))");
-    boost::regex specialNumLiteralRegex(R"(^(\s*)([+-]?(nan|inf)))");
+    boost::regex specialNumLiteralRegex(R"(^(\s*)([+-]?(nan|inf)(?![-\w])))");
     boost::smatch match;
     if (boost::regex_search(strToCheck, match, specialNumLiteralRegex) && !match.prefix().length()) {
         auto matchedStr = match[3].str();
@@ -87,7 +87,7 @@ std::tuple<Type::Type*, size_t, std::string> CheckBooleanLiteral(std::string str
     Type::Type* literalType = nullptr;
     size_t literalStartIndex;
     std::string literalContent;
-    boost::regex boolLiteralRegex(R"((\s*)(true|false)(?![-\w]))");
+    boost::regex boolLiteralRegex(R"(^(\s*)((true|false)(?![-\w])))");
     boost::smatch match;
     if (boost::regex_search(strToCheck, match, boolLiteralRegex) && !match.prefix().length()) {
         literalType = new Type::Boolean();
@@ -175,7 +175,7 @@ extern std::tuple<size_t, std::string> CheckPunctuator(std::string strToCheck);
 std::tuple<size_t, std::string> CheckPunctuator(std::string strToCheck) {
     size_t punctuatorStartIndex;
     std::string punctuatorContent;
-    boost::regex punctuatorRegex(R"((\s*)(\{|\}|\[|\]|,))");
+    boost::regex punctuatorRegex(R"(^(\s*)(\{|\}|\[|\]|,))");
     boost::smatch match;
     if (boost::regex_search(strToCheck, match, punctuatorRegex) && !match.prefix().length()) {
         punctuatorStartIndex = match[1].length();
@@ -191,7 +191,7 @@ extern std::tuple<size_t, std::string> CheckOperator(std::string strToCheck);
 std::tuple<size_t, std::string> CheckOperator(std::string strToCheck) {
     size_t operatorStartIndex;
     std::string operatorContent;
-    boost::regex operatorRegex(R"((\s*)(\.|=))");
+    boost::regex operatorRegex(R"(^(\s*)(\.|=))");
     boost::smatch match;
     if (boost::regex_search(strToCheck, match, operatorRegex) && !match.prefix().length()) {
         operatorStartIndex = match[1].length();
@@ -207,7 +207,7 @@ extern std::tuple<size_t, std::string> CheckComment(std::string strToCheck);
 std::tuple<size_t, std::string> CheckComment(std::string strToCheck) {
     size_t commentStartIndex;
     std::string commentContent;
-    boost::regex commentRegex(R"((\s*)(#[^\n]*))");
+    boost::regex commentRegex(R"(^(\s*)(#[^\n]*))");
     boost::smatch match;
     if (boost::regex_search(strToCheck, match, commentRegex) && !match.prefix().length()) {
         commentStartIndex = match[1].length();
