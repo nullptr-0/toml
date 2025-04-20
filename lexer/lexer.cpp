@@ -232,10 +232,9 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition:
             }
         }
         isContinued = false;
-        bool commentAppearsFirst = firstAppearedStringOrCommentStarter(codeToProcess) == "#";
         while (codeToProcess.size()) {
             // Comment
-            auto procComment = [&]() {
+            {
                 auto [tokenStartIndex, tokenContent] = CheckComment(codeToProcess);
                 if (!tokenContent.empty()) {
                     auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
@@ -247,12 +246,11 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition:
                     if (tokenContent.find('#') >= tokenContent.size() ? false : !isStringContentValid(tokenContent.substr(tokenContent.find('#') + 1), 0)) {
                         errors.push_back({ "Comment contains invalid content.", tokenRegion });
                     }
-                    return true;
+                    continue;
                 }
-                return false;
-            };
+            }
             // String Literal
-            auto procString = [&]() {
+            {
                 auto [tokenType, tokenStartIndex, tokenContent] = CheckStringLiteral(codeToProcess);
                 if (!tokenContent.empty()) {
                     auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
@@ -264,23 +262,6 @@ std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition:
                     if (!isStringContentValid(tokenContent, ((Type::String*)tokenType)->getType())) {
                         errors.push_back({ "String literal contains invalid content.", tokenRegion });
                     }
-                    return true;
-                }
-                return false;
-            };
-            if (commentAppearsFirst) {
-                if (procComment()) {
-                    continue;
-                }
-                if (procString()) {
-                    continue;
-                }
-            }
-            else {
-                if (procString()) {
-                    continue;
-                }
-                if (procComment()) {
                     continue;
                 }
             }

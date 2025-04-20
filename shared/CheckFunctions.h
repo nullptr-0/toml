@@ -278,7 +278,7 @@ std::tuple<Type::Type*, size_t, std::string> CheckStringLiteral(std::string strT
 #endif
 
 #ifndef DEF_GLOBAL
-extern std::string firstAppearedStringOrCommentStarter(const std::string& input);
+extern bool HasIncompleteString(const std::string& input);
 #else
 std::string firstAppearedStringOrCommentStarter(const std::string& input) {
     size_t pos_single = input.find("'''");
@@ -303,11 +303,7 @@ std::string firstAppearedStringOrCommentStarter(const std::string& input) {
         return "";
     }
 }
-#endif
 
-#ifndef DEF_GLOBAL
-extern bool HasIncompleteString(const std::string& input);
-#else
 bool HasIncompleteString(const std::string& input) {
     boost::regex commentRegex(R"((\s*)(#[^\n]*))");
     boost::regex multiLineBasicStringLiteralRegex(R"mlbslr(("""((("{0,2})(?!")([^"\\]|\\[btnfr"\\]|\\u[\da-fA-F]{4}|\\U[\da-fA-F]{8}|\\[ \f\r\t\v]*\n\s*|((?<![^\\]")"(?!"))|((?<![^\\]")("")(?!")))*(?<![^\\]")("{0,2}))|(((?<="{3})("{1,2})(?="{3}))?))"""))mlbslr");
