@@ -15,12 +15,6 @@ namespace Type
         if (auto* typeInvalid = dynamic_cast<Invalid*>(type)) {
             copy = new Invalid(*typeInvalid);
         }
-        else if (auto* typeTable = dynamic_cast<Table*>(type)) {
-            copy = new Table(*typeTable);
-        }
-        else if (auto* typeArray = dynamic_cast<Array*>(type)) {
-            copy = new Array(*typeArray);
-        }
         else if (auto* typeBoolean = dynamic_cast<Boolean*>(type)) {
             copy = new Boolean(*typeBoolean);
         }
@@ -52,12 +46,6 @@ namespace Type
         }
         if (auto* typeInvalid = dynamic_cast<Invalid*>(type)) {
             delete typeInvalid;
-        }
-        else if (auto* typeTable = dynamic_cast<Table*>(type)) {
-            delete typeTable;
-        }
-        else if (auto* typeArray = dynamic_cast<Array*>(type)) {
-            delete typeArray;
         }
         else if (auto* typeBoolean = dynamic_cast<Boolean*>(type)) {
             delete typeBoolean;

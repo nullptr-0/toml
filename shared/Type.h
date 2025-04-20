@@ -28,18 +28,6 @@ namespace Type
         virtual ~Valid() {}
     };
 
-    class Table : public Valid {
-    public:
-        Table() {}
-        virtual ~Table() {}
-    };
-
-    class Array : public Valid {
-    public:
-        Array() {}
-        virtual ~Array() {}
-    };
-
     class BuiltIn : public Valid {
     public:
         BuiltIn() {}

@@ -39,13 +39,7 @@ namespace Dump
                 logger << "invalid\n";
             }
             else if (dynamic_cast<Type::Valid*>(type)) {
-                if (dynamic_cast<Type::Table*>(type)) {
-                    logger << "table\n";
-                }
-                else if (dynamic_cast<Type::Array*>(type)) {
-                    logger << "array\n";
-                }
-                else if (dynamic_cast<Type::BuiltIn*>(type)) {
+                if (dynamic_cast<Type::BuiltIn*>(type)) {
                     if (dynamic_cast<Type::Boolean*>(type)) {
                         logger << "boolean\n";
                     }
