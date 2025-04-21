@@ -4,7 +4,6 @@
 #define DOC_TREE_2_JSON_H
 
 #include <stdexcept>
-#include <limits>
 #include <json.hpp>
 #include "DocumentTree.h"
 #include "TomlStringUtils.h"
@@ -16,46 +15,6 @@ namespace DocTree {
 #ifndef DEF_GLOBAL
     extern json toJson(const DocTreeNode* node, bool isValueTagged);
 #else
-    std::string convertToDecimalString(std::string input) {
-        if (input.empty()) {
-            return "Empty string";
-        }
-        bool isNeg = input[0] == '-';
-        if (isNeg) {
-            input = input.substr(1);
-        }
-        int base = 10;
-        size_t start = 0;
-
-        if (input.size() > 2 && input[0] == '0') {
-            if (input[1] == 'x') {
-                base = 16;
-                start = 2;
-            }
-            else if (input[1] == 'o') {
-                base = 8;
-                start = 2;
-            }
-            else if (input[1] == 'b') {
-                base = 2;
-                start = 2;
-            }
-        }
-
-        std::string numberPart = input.substr(start);
-
-        try {
-            unsigned long long value = std::stoull(numberPart, nullptr, base);
-            return (isNeg && value ? "-" : "") + std::to_string(value);
-        }
-        catch (const std::invalid_argument&) {
-            return "Invalid input";
-        }
-        catch (const std::out_of_range&) {
-            return "Number out of range";
-        }
-    }
-
     json toJson(const DocTreeNode* node, bool isValueTagged) {
         if (!node) {
             return nullptr; // Handle nullptr nodes as JSON null

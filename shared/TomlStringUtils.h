@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <regex>
+#include <limits>
 
 #ifndef DEF_GLOBAL
 extern std::string extractStringLiteralContent(const std::string& stringLiteral, int type);
@@ -193,6 +194,50 @@ std::string extractStringLiteralContent(const std::string& stringLiteral, int ty
     }
 }
 
+#endif
+
+#ifndef DEF_GLOBAL
+extern std::string convertToDecimalString(std::string input);
+#else
+std::string convertToDecimalString(std::string input) {
+    if (input.empty()) {
+        return "Empty string";
+    }
+    bool isNeg = input[0] == '-';
+    if (isNeg) {
+        input = input.substr(1);
+    }
+    int base = 10;
+    size_t start = 0;
+
+    if (input.size() > 2 && input[0] == '0') {
+        if (input[1] == 'x') {
+            base = 16;
+            start = 2;
+        }
+        else if (input[1] == 'o') {
+            base = 8;
+            start = 2;
+        }
+        else if (input[1] == 'b') {
+            base = 2;
+            start = 2;
+        }
+    }
+
+    std::string numberPart = input.substr(start);
+
+    try {
+        unsigned long long value = std::stoull(numberPart, nullptr, base);
+        return (isNeg && value ? "-" : "") + std::to_string(value);
+    }
+    catch (const std::invalid_argument&) {
+        return "Invalid input";
+    }
+    catch (const std::out_of_range&) {
+        return "Number out of range";
+    }
+}
 #endif
 
 #endif
