@@ -56,18 +56,18 @@ if (BUILD_WASM)
 endif()
 
 set(TOML_SOURCES
-    shared/shared.cpp
-    lexer/lexer.cpp
-    rdparser/rdparser.cpp
-    langsvr/langsvr.cpp
-    toml.cpp
+    shared/Shared.cpp
+    lexer/TomlLexer.cpp
+    rdparser/TomlRdParser.cpp
+    langsvr/TomlLangSvr.cpp
+    driver/Toml.cpp
 )
 
 set(TEST_SOURCES
-    shared/shared.cpp
-    lexer/lexer.cpp
-    rdparser/rdparser.cpp
-    test.cpp
+    shared/Shared.cpp
+    lexer/TomlLexer.cpp
+    rdparser/TomlRdParser.cpp
+    driver/Test.cpp
 )
 
 if (BUILD_WASM)

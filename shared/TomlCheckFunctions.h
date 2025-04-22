@@ -281,22 +281,22 @@ std::tuple<Type::Type*, size_t, std::string> CheckStringLiteral(std::string strT
 extern bool HasIncompleteString(const std::string& input);
 #else
 std::string firstAppearedStringOrCommentStarter(const std::string& input) {
-    size_t pos_single = input.find("'''");
-    size_t pos_double = input.find("\"\"\"");
-    size_t pos_hash = input.find("#");
+    size_t posSingle = input.find("'''");
+    size_t posDouble = input.find("\"\"\"");
+    size_t posHash = input.find("#");
 
     // Set to string::npos if not found
-    if (pos_single == std::string::npos) pos_single = input.length() + 1;
-    if (pos_double == std::string::npos) pos_double = input.length() + 1;
-    if (pos_hash == std::string::npos) pos_hash = input.length() + 1;
+    if (posSingle == std::string::npos) posSingle = input.length() + 1;
+    if (posDouble == std::string::npos) posDouble = input.length() + 1;
+    if (posHash == std::string::npos) posHash = input.length() + 1;
 
-    if (pos_single < pos_double && pos_single < pos_hash) {
+    if (posSingle < posDouble && posSingle < posHash) {
         return "'''";
     }
-    else if (pos_double < pos_single && pos_double < pos_hash) {
+    else if (posDouble < posSingle && posDouble < posHash) {
         return "\"\"\"";
     }
-    else if (pos_hash < pos_single && pos_hash < pos_double) {
+    else if (posHash < posSingle && posHash < posDouble) {
         return "#";
     }
     else {

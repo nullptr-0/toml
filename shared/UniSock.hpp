@@ -19,7 +19,7 @@
 #include <unistd.h>
 #endif
 
-#include "descman.hpp"
+#include "DescMan.hpp"
 
 struct SocketAllocator {
     int operator()() {

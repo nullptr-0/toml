@@ -32,7 +32,7 @@ A C++20 implementation of a TOML parser and language server with JSON conversion
    ```
    - Build WebAssembly module:
    ```bash
-   ./build-wasm
+   ./BuildWasm
    ```
    - Build the NodeJS version:
    ```bash
@@ -88,14 +88,13 @@ Throws exceptions if DEBUG preprocessor definition is present when building.
 ## Project Structure
 ```
 ├── CMakeLists.txt
-├── lexer/           # Tokenization implementation
+├── driver/          # Main and test driver
+├── lexer/           # Lexer
 ├── rdparser/        # Recursive descent parser
-├── langsvr/         # Language Server Protocol implementation
+├── langsvr/         # Language Server
 ├── shared/          # Common utilities
-├── node/            # NodeJS wrapper for the native implementation
-├── lib/             # External Libraries
-├── toml.cpp         # Main application
-└── test.cpp         # Test application
+├── node/            # NodeJS wrapper
+└── lib/             # External Libraries
 ```
 
 ## License

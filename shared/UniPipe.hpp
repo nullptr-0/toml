@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #endif
 
-#include "descman.hpp"
+#include "DescMan.hpp"
 
 struct NamedPipeDescriptor {
     enum mode {

@@ -2,13 +2,9 @@
 #include <fstream>
 #include <filesystem>
 #include <functional>
-#include "shared/Token.h"
-#include "shared/DocumentTree.h"
-#include "shared/Dump.h"
-#include "shared/DocTree2Json.h"
-
-extern std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> lexerMain(std::istream& inputCode, bool multilineToken = true);
-extern std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::unordered_map<size_t, DocTree::Key*>> rdparserMain(Token::TokenList<>& tokenList);
+#include "Components.h"
+#include "../shared/Dump.h"
+#include "../shared/DocTree2Json.h"
 
 //#define DEBUG
 
@@ -60,8 +56,8 @@ int main(int argc, char* argv[])
 #endif // DEBUG
             std::vector<std::tuple<std::string, FilePosition::Region>> errors;
             std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
-            auto [tokenList, lexErrors, lexWarnings] = lexerMain(*inputStream, true);
-            auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = rdparserMain(tokenList);
+            auto [tokenList, lexErrors, lexWarnings] = TomlLexerMain(*inputStream, true);
+            auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = TomlRdparserMain(tokenList);
             errors.insert(errors.end(), lexErrors.begin(), lexErrors.end());
             errors.insert(errors.end(), parseErrors.begin(), parseErrors.end());
             warnings.insert(warnings.end(), lexWarnings.begin(), lexWarnings.end());

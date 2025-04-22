@@ -1,6 +1,6 @@
 // Used for declaration of global variable and function
 #define DEF_GLOBAL
-#include "CheckFunctions.h"
+#include "TomlCheckFunctions.h"
 #include "Log.h"
 #include "TypeUtils.h"
 #include "Dump.h"

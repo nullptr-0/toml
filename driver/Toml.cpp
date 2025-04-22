@@ -3,25 +3,19 @@
 #include <sstream>
 #include <filesystem>
 #include <functional>
-#include "shared/Token.h"
-#include "shared/DocumentTree.h"
-#include "shared/Dump.h"
-#include "shared/DocTree2Json.h"
+#include "Components.h"
+#include "../shared/Dump.h"
+#include "../shared/DocTree2Json.h"
 
 #ifndef STDIO_ONLY
-#include "shared/unisock.hpp"
-#include "shared/unipipe.hpp"
+#include "../shared/UniSock.hpp"
+#include "../shared/UniPipe.hpp"
 #endif // !STDIO_ONLY
 
 #ifdef EMSCRIPTEN
-#include "shared/BlockingInput.h"
+#include "../shared/BlockingInput.h"
 BlockingStdinStream cbin;
 #endif
-
-extern std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> lexerMain(std::istream& inputCode, bool multilineToken = true);
-extern std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::unordered_map<size_t, DocTree::Key*>> rdparserMain(Token::TokenList<>& tokenList);
-
-extern int langSvrMain(std::istream& inChannel, std::ostream& outChannel, const std::function<std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>>(const std::string&, bool)>& lexer, const std::function<std::tuple<DocTree::Table*, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::unordered_map<size_t, DocTree::Key*>>(Token::TokenList<>& tokenList)>& parser);
 
 //#define DEBUG
 
@@ -55,17 +49,17 @@ int main(int argc, char* argv[]) {
     if (argc >= 3 && argVector[1] == "--langsvr") {
         auto lexer = [](const std::string& input, bool multilineToken) -> std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> {
             std::istringstream stream(input);
-            return lexerMain(stream, multilineToken);
+            return TomlLexerMain(stream, multilineToken);
         };
         int retVal = 1;
         if (argc == 3 && argVector[2] == "--stdio") {
-            retVal = langSvrMain(
+            retVal = TomlLangSvrMain(
 #ifdef EMSCRIPTEN
                 cbin
 #else
                 std::cin
 #endif
-                , std::cout, lexer, rdparserMain);
+                , std::cout, lexer, TomlRdparserMain);
         }
 #ifndef STDIO_ONLY
         else if (argc >= 3 && (argVector[2].substr(0, 6) == "--port" || argVector[2].substr(0, 8) == "--socket")) {
@@ -88,7 +82,7 @@ int main(int argc, char* argv[]) {
                     throw std::runtime_error("unable to open socket on port " + port);
                     return 2;
                 }
-                retVal = langSvrMain(socket, socket, lexer, rdparserMain);
+                retVal = TomlLangSvrMain(socket, socket, lexer, TomlRdparserMain);
 #ifndef DEBUG
             }
             catch (const std::exception& e) {
@@ -115,7 +109,7 @@ int main(int argc, char* argv[]) {
                 if (!pipe.is_open()) {
                     throw std::runtime_error("unable to open pipe " + pipeName);
                 }
-                retVal = langSvrMain(pipe, pipe, lexer, rdparserMain);
+                retVal = TomlLangSvrMain(pipe, pipe, lexer, TomlRdparserMain);
 #ifndef DEBUG
             }
             catch (const std::exception& e) {
@@ -177,8 +171,8 @@ int main(int argc, char* argv[]) {
                 auto inputStream = getStreamForDiskFile(inputPath, std::ios::in);
                 std::vector<std::tuple<std::string, FilePosition::Region>> errors;
                 std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
-                auto [tokenList, lexErrors, lexWarnings] = lexerMain(*inputStream, true);
-                auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = rdparserMain(tokenList);
+                auto [tokenList, lexErrors, lexWarnings] = TomlLexerMain(*inputStream, true);
+                auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = TomlRdparserMain(tokenList);
                 errors.insert(errors.end(), lexErrors.begin(), lexErrors.end());
                 errors.insert(errors.end(), parseErrors.begin(), parseErrors.end());
                 warnings.insert(warnings.end(), lexWarnings.begin(), lexWarnings.end());
