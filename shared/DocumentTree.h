@@ -95,6 +95,10 @@ namespace DocTree
             }
         }
 
+        ValueArray getElems() const {
+            return elems;
+        }
+
         ValueArray& getElems() {
             return elems;
         }
@@ -191,6 +195,10 @@ namespace DocTree
 
         void addElem(Key* key) {
             elems[std::get<0>(key->get())] = key;
+        }
+
+        KeyTable getElems() const {
+            return elems;
         }
 
         KeyTable& getElems() {
