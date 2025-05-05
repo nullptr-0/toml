@@ -168,7 +168,11 @@ public:
     int write(const void* buffer, const size_t length) {
 #ifdef _WIN32
         DWORD bytesWritten;
+// disablw warning C4267: 'argument': conversion from 'size_t' to 'DWORD', possible loss of data
+#pragma warning(push)
+#pragma warning(disable: 4267)
         if (!WriteFile(pipeDescriptor->pipeHandle, buffer, length, &bytesWritten, NULL)) {
+#pragma warning(pop)
             throw std::runtime_error("Failed to write to named pipe");
         }
         FlushFileBuffers(pipeDescriptor->pipeHandle);
@@ -185,7 +189,11 @@ public:
     int read(void* buffer, const size_t length) {
 #ifdef _WIN32
         DWORD bytesRead;
+// disablw warning C4267: 'argument': conversion from 'size_t' to 'DWORD', possible loss of data
+#pragma warning(push)
+#pragma warning(disable: 4267)
         if (!ReadFile(pipeDescriptor->pipeHandle, buffer, length, &bytesRead, NULL)) {
+#pragma warning(pop)
             throw std::runtime_error("Failed to read from named pipe");
         }
         return bytesRead;

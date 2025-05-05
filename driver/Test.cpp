@@ -2,7 +2,7 @@
 #include <fstream>
 #include <filesystem>
 #include <functional>
-#include "Components.h"
+#include "../shared/Components.h"
 #include "../shared/Dump.h"
 #include "../shared/DocTree2Json.h"
 

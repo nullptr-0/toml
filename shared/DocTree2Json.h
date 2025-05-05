@@ -22,7 +22,7 @@ namespace DocTree {
 
         // Handle Value nodes
         if (const Value* valueNode = dynamic_cast<const Value*>(node)) {
-            auto [type, valueStr] = valueNode->get();
+            auto [type, valueStr, defPos] = valueNode->get();
 
             if (dynamic_cast<Type::String*>(type)) {
                 if (isValueTagged) {

@@ -37,10 +37,37 @@ export function activate(context: vscode.ExtensionContext) {
     clientOptions
   );
 
+  const getAndSendNewCslSchemas = (onStartUp: boolean) => {
+    const config = vscode.workspace.getConfiguration();
+    const cslSchemas = config.get<string>("toml.csl.cslSchemas");
+    if (cslSchemas && (!onStartUp || cslSchemas.length)) {
+      const cslSchema = config.get<string>("toml.csl.cslSchema");
+      client.sendRequest("configSchemaLanguage/setSchemas", { schemas: cslSchemas, schema: cslSchema ? cslSchema : "" });
+    }
+  };
+
+  const getAndSendNewCslSchema = (onStartUp: boolean) => {
+    const config = vscode.workspace.getConfiguration();
+    const cslSchema = config.get<string>("toml.csl.cslSchema");
+    if (cslSchema && (!onStartUp || cslSchema.length)) {
+      client.sendRequest("configSchemaLanguage/setSchema", { schema: cslSchema });
+    }
+  };
+
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+    if (e.affectsConfiguration('toml.csl.cslSchemas')) {
+      getAndSendNewCslSchemas(false);
+    }
+    if (e.affectsConfiguration('toml.csl.cslSchema')) {
+      getAndSendNewCslSchema(false);
+    }
+  }));
+
   client
     .start()
     .then(() => {
       vscode.window.showInformationMessage("TOML Language Service Ready");
+      getAndSendNewCslSchemas(true);
     })
     .catch((reason) => {
       console.error("Cannot start toml language service: ", reason);

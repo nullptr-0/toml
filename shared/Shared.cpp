@@ -7,3 +7,5 @@
 #include "TomlStringUtils.h"
 #include "DocTree2Json.h"
 #include "DocTree2Toml.h"
+#include "CslCheckFunctions.h"
+#include "CslStringUtils.h"

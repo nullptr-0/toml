@@ -58,7 +58,10 @@ endif()
 set(TOML_SOURCES
     shared/Shared.cpp
     lexer/TomlLexer.cpp
+    lexer/CslLexer.cpp
     rdparser/TomlRdParser.cpp
+    rdparser/CslRdParser.cpp
+    validator/CslValidator.cpp
     langsvr/TomlLangSvr.cpp
     driver/Toml.cpp
 )

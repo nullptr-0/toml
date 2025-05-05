@@ -30,7 +30,7 @@ namespace DocTree
 
     class Value : public DocTreeNode {
     public:
-        Value(Type::Type* type, std::string value) : type(Type::CopyType(type)), value(value) {}
+        Value(Type::Type* type, std::string value, FilePosition::Region defPos) : type(CopyType(type)), value(value), defPos(defPos) {}
 
         ~Value() {
             if (type) {
@@ -38,8 +38,8 @@ namespace DocTree
             }
         }
 
-        std::tuple<Type::Type*, std::string> get() const {
-            return std::make_tuple(type, value);
+        std::tuple<Type::Type*, std::string, FilePosition::Region> get() const {
+            return std::make_tuple(type, value, defPos);
         }
 
         template <int N>
@@ -50,6 +50,9 @@ namespace DocTree
             else if constexpr (N == 1) {
                 get_any_val(std::string, this->value)
             }
+            else if constexpr (N == 2) {
+                get_any_val(FilePosition::Region, this->defPos)
+            }
             else {
                 throw std::invalid_argument("Invalid setter index");
             }
@@ -58,6 +61,7 @@ namespace DocTree
     protected:
         Type::Type* type;
         std::string value;
+        FilePosition::Region defPos;
     };
 
     class Array : public DocTreeNode {

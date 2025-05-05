@@ -30,6 +30,24 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "configuration": {
+      "title": "TOML",
+      "properties": {
+        "toml.csl.cslSchemas": {
+          "order": 0,
+          "type": "string",
+          "editPresentation": "multilineText",
+          "default": "",
+          "markdownDescription": "CSL schemas for TOML validation."
+        },
+        "toml.csl.cslSchema": {
+          "order": 1,
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Currently used CSL schema. Only applies when `#toml.csl.cslSchemas#` is set."
+        }
+      }
+    },
     "semanticTokenTypes": [
       {
         "id": "datetime",

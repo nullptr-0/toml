@@ -3,13 +3,13 @@
 #include <list>
 #include <tuple>
 #include <regex>
-#include "../shared/TomlCheckFunctions.h"
+#include "../shared/CslCheckFunctions.h"
 #include "../shared/Token.h"
 #include "../shared/FilePosition.h"
 
-using namespace TOML;
+using namespace CSL;
 
-namespace TOMLLexer {
+namespace CSLLexer {
     class Lexer {
     protected:
         std::istream& inputCode;
@@ -273,10 +273,10 @@ namespace TOMLLexer {
                             auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
                             auto tokenEnd = getEndPosition(tokenContent, tokenStart);
                             FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
-                            tokenList.AddTokenToList(tokenContent, "comment", nullptr, tokenRegion);
+                            //tokenList.AddTokenToList(tokenContent, "comment", nullptr, tokenRegion);
                             currentPosition = tokenEnd;
                             codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
-                            if (tokenContent.find('#') >= tokenContent.size() ? false : !isStringContentValid(tokenContent.substr(tokenContent.find('#') + 1), 0)) {
+                            if (tokenContent.find("//") >= tokenContent.size() ? false : !isStringContentValid(tokenContent.substr(tokenContent.find('#') + 1), 0)) {
                                 errors.push_back({ "Comment contains invalid content.", tokenRegion });
                             }
                             continue;
@@ -343,6 +343,45 @@ namespace TOMLLexer {
                             continue;
                         }
                     }
+                    // Keyword
+                    {
+                        auto [tokenStartIndex, tokenContent] = CheckKeyword(codeToProcess);
+                        if (!tokenContent.empty()) {
+                            auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                            auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                            FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                            tokenList.AddTokenToList(tokenContent, "keyword", nullptr, tokenRegion);
+                            currentPosition = tokenEnd;
+                            codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                            continue;
+                        }
+                    }
+                    // Type
+                    {
+                        auto [tokenStartIndex, tokenContent] = CheckType(codeToProcess);
+                        if (!tokenContent.empty()) {
+                            auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                            auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                            FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                            tokenList.AddTokenToList(tokenContent, "type", nullptr, tokenRegion);
+                            currentPosition = tokenEnd;
+                            codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                            continue;
+                        }
+                    }
+                    // Operator
+                    {
+                        auto [tokenStartIndex, tokenContent] = CheckOperator(codeToProcess);
+                        if (!tokenContent.empty()) {
+                            auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
+                            auto tokenEnd = getEndPosition(tokenContent, tokenStart);
+                            FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
+                            tokenList.AddTokenToList(tokenContent, "operator", nullptr, tokenRegion);
+                            currentPosition = tokenEnd;
+                            codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
+                            continue;
+                        }
+                    }
                     // Identifier
                     {
                         auto [tokenStartIndex, tokenContent] = CheckIdentifier(codeToProcess);
@@ -364,19 +403,6 @@ namespace TOMLLexer {
                             auto tokenEnd = getEndPosition(tokenContent, tokenStart);
                             FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
                             tokenList.AddTokenToList(tokenContent, "punctuator", nullptr, tokenRegion);
-                            currentPosition = tokenEnd;
-                            codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
-                            continue;
-                        }
-                    }
-                    // Operator
-                    {
-                        auto [tokenStartIndex, tokenContent] = CheckOperator(codeToProcess);
-                        if (!tokenContent.empty()) {
-                            auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
-                            auto tokenEnd = getEndPosition(tokenContent, tokenStart);
-                            FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
-                            tokenList.AddTokenToList(tokenContent, "operator", nullptr, tokenRegion);
                             currentPosition = tokenEnd;
                             codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                             continue;
@@ -427,7 +453,7 @@ namespace TOMLLexer {
     };
 }
 
-std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> TomlLexerMain(std::istream& inputCode, bool multilineToken = true) {
-    TOMLLexer::Lexer lexer(inputCode, multilineToken);
+std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> CslLexerMain(std::istream& inputCode, bool multilineToken = true) {
+    CSLLexer::Lexer lexer(inputCode, multilineToken);
     return { lexer.Lex(), lexer.GetErrors(), lexer.GetWarnings() };
 }

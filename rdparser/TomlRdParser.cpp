@@ -10,6 +10,8 @@
 #include "../shared/DocumentTree.h"
 #include "../shared/TomlStringUtils.h"
 
+using namespace TOML;
+
 namespace TOMLParser {
     class RecursiveDescentParser {
     protected:
@@ -18,6 +20,7 @@ namespace TOMLParser {
         std::unordered_map<size_t, DocTree::Key*> tokenDocTreeMapping;
         DocTree::Table* docTree;
         DocTree::Table* lastDefinedTable;
+        std::unordered_set<DocTree::Table*> headerDefinedTables;
         std::vector<std::tuple<std::string, FilePosition::Region>> errors;
         std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
 
@@ -34,7 +37,7 @@ namespace TOMLParser {
             }
             else if (std::get<1>(*position) == "string") {
                 auto stringType = ((Type::String*)std::get<2>(*position))->getType();
-                if (stringType == Type::String::MultiLineBasic || stringType == Type::String::MultiLineLiteral) {
+                if (stringType == Type::String::MultiLineBasic || stringType == Type::String::MultiLineRaw) {
                     errors.push_back({ "Multi-line string cannot be used as a key.", std::get<3>(*position) });
                 }
                 auto contentInString = std::get<0>(*position).substr(1, std::get<0>(*position).size() - 2);
@@ -94,7 +97,6 @@ namespace TOMLParser {
         }
 
         std::tuple<ParsedKeyType, DocTree::DocTreeNode*> ParseKey() {
-            static std::unordered_set<DocTree::Table*> headerDefinedTables;
             DocTree::DocTreeNode* targetKey = nullptr;
             ParsedKeyType type = ParsedKeyType::Key;
             if (position != input.end() && std::get<0>(*position) == "[") {
@@ -382,7 +384,7 @@ namespace TOMLParser {
                             }
                             else if (auto value = dynamic_cast<DocTree::Value*>(keyValue)) {
                                 auto stringValue = dynamic_cast<Type::String*>(std::get<0>(value->get()));
-                                if (stringValue && (stringValue->getType() == Type::String::MultiLineBasic || stringValue->getType() == Type::String::MultiLineLiteral)) {
+                                if (stringValue && (stringValue->getType() == Type::String::MultiLineBasic || stringValue->getType() == Type::String::MultiLineRaw)) {
                                     allowMultiLine = true;
                                 }
                             }
@@ -436,7 +438,7 @@ namespace TOMLParser {
                         errors.push_back({ "Type of " + std::get<0>(*position) + " is not string, integer, floating-point, NaN, infinity, boolean or date-time.", std::get<3>(*position) });
                     }
                     else {
-                        parsedValue = new DocTree::Value(valueType, std::get<0>(*position));
+                        parsedValue = new DocTree::Value(valueType, std::get<0>(*position), {});
                     }
                     ++position;
                 }
@@ -490,6 +492,9 @@ namespace TOMLParser {
                             }
                             else if (auto tableValue = dynamic_cast<DocTree::Table*>(value)) {
                                 tableValue->set<2>(keyDefPos);
+                            }
+                            else if (auto valueValue = dynamic_cast<DocTree::Value*>(value)) {
+                                valueValue->set<2>(keyDefPos);
                             }
                         }
                         else {

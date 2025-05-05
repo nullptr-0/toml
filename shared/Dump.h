@@ -68,10 +68,10 @@ namespace Dump
                         else if (stringType == Type::String::MultiLineBasic) {
                             logger << "multi-line string\n";
                         }
-                        else if (stringType == Type::String::Literal) {
+                        else if (stringType == Type::String::Raw) {
                             logger << "literal string\n";
                         }
-                        else if (stringType == Type::String::MultiLineLiteral) {
+                        else if (stringType == Type::String::MultiLineRaw) {
                             logger << "multi-line literal string\n";
                         }
                     }

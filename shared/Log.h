@@ -22,6 +22,17 @@ namespace Log
     };
 
 #ifndef DEF_GLOBAL
+    extern std::string getCurrentDate();
+#else
+    std::string getCurrentDate() {
+        std::time_t now = std::time(nullptr);
+        char buf[80];
+        std::strftime(buf, sizeof(buf), "%Y-%m-%d", std::localtime(&now));
+        return buf;
+    }
+#endif
+
+#ifndef DEF_GLOBAL
     extern std::string getCurrentTime();
 #else
     std::string getCurrentTime() {
@@ -171,15 +182,15 @@ namespace Log
             logMessage(type, tag, message, output, fileName);
         }
 
-        void e(LogType type, const std::string& tag, const std::string& message) const {
+        void e(const std::string& tag, const std::string& message) const {
             logMessage(LogType::Error, tag, message, output, fileName);
         }
 
-        void w(LogType type, const std::string& tag, const std::string& message) const {
+        void w(const std::string& tag, const std::string& message) const {
             logMessage(LogType::Warning, tag, message, output, fileName);
         }
 
-        void i(LogType type, const std::string& tag, const std::string& message) const {
+        void i(const std::string& tag, const std::string& message) const {
             logMessage(LogType::Info, tag, message, output, fileName);
         }
     };

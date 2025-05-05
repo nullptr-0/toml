@@ -85,8 +85,8 @@ namespace Type
         enum StringType {
             Basic,
             MultiLineBasic,
-            Literal,
-            MultiLineLiteral
+            Raw,
+            MultiLineRaw
         };
 
         String(StringType type) : type(type) {}

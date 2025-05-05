@@ -3,7 +3,7 @@
 #include <sstream>
 #include <filesystem>
 #include <functional>
-#include "Components.h"
+#include "../shared/Components.h"
 #include "../shared/Dump.h"
 #include "../shared/DocTree2Json.h"
 
@@ -32,8 +32,8 @@ int main(int argc, char* argv[]) {
     };
     auto printHelp = [&argVector](std::ostream& stream) {
         stream << "Usage:\n"
-            << argVector[0] << " --parse <path>[ --output=<path>]\n"
-            << argVector[0] << " --parse <path>[ --output <path>]\n"
+            << argVector[0] << " --parse <path>[ --validate=<path>][ --schema=<name>][ --output=<path>]\n"
+            << argVector[0] << " --parse <path>[ --validate <path>][ --schema <name>][ --output <path>]\n"
             << argVector[0] << " --langsvr --stdio\n"
 #ifndef STDIO_ONLY
             << argVector[0] << " --langsvr --socket=<port>\n"
@@ -47,10 +47,14 @@ int main(int argc, char* argv[]) {
             << argVector[0] << " -h\n";
     };
     if (argc >= 3 && argVector[1] == "--langsvr") {
-        auto lexer = [](const std::string& input, bool multilineToken) -> std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> {
+        auto tomlStringLexer = [](const std::string& input, bool multilineToken) -> std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> {
             std::istringstream stream(input);
             return TomlLexerMain(stream, multilineToken);
         };
+        auto cslStringLexer = [](const std::string& input, bool multilineToken) -> std::tuple<Token::TokenList<>, std::vector<std::tuple<std::string, FilePosition::Region>>, std::vector<std::tuple<std::string, FilePosition::Region>>> {
+            std::istringstream stream(input);
+            return CslLexerMain(stream, multilineToken);
+            };
         int retVal = 1;
         if (argc == 3 && argVector[2] == "--stdio") {
             retVal = TomlLangSvrMain(
@@ -59,7 +63,7 @@ int main(int argc, char* argv[]) {
 #else
                 std::cin
 #endif
-                , std::cout, lexer, TomlRdparserMain);
+                , std::cout, tomlStringLexer, TomlRdparserMain, cslStringLexer, CslRdParserMain, CslValidatorMain);
         }
 #ifndef STDIO_ONLY
         else if (argc >= 3 && (argVector[2].substr(0, 6) == "--port" || argVector[2].substr(0, 8) == "--socket")) {
@@ -82,7 +86,7 @@ int main(int argc, char* argv[]) {
                     throw std::runtime_error("unable to open socket on port " + port);
                     return 2;
                 }
-                retVal = TomlLangSvrMain(socket, socket, lexer, TomlRdparserMain);
+                retVal = TomlLangSvrMain(socket, socket, tomlStringLexer, TomlRdparserMain, cslStringLexer, CslRdParserMain, CslValidatorMain);
 #ifndef DEBUG
             }
             catch (const std::exception& e) {
@@ -109,7 +113,7 @@ int main(int argc, char* argv[]) {
                 if (!pipe.is_open()) {
                     throw std::runtime_error("unable to open pipe " + pipeName);
                 }
-                retVal = TomlLangSvrMain(pipe, pipe, lexer, TomlRdparserMain);
+                retVal = TomlLangSvrMain(pipe, pipe, tomlStringLexer, TomlRdparserMain, cslStringLexer, CslRdParserMain, CslValidatorMain);
 #ifndef DEBUG
             }
             catch (const std::exception& e) {
@@ -132,17 +136,74 @@ int main(int argc, char* argv[]) {
     }
     else if (argc >= 3 && argVector[1] == "--parse") {
         int retVal = 0;
+        std::string cslPath;
+        std::string cslSchemaName;
         std::string outputPath;
-        if (argc >= 4) {
-            if (argc == 5 && argVector[3] == "--output") {
-                outputPath = argVector[4];
+        for (size_t i = 3; i < argVector.size(); ++i) {
+            const std::string& arg = argv[i];
+
+            // Check for --validate
+            if (arg.rfind("--validate=", 0) == 0) {
+                cslPath = arg.substr(11); // skip "--validate="
             }
-            else if (argc == 4 && argVector[3].substr(0, 8) == "--output=") {
-                outputPath = argVector[3].substr(9);
+            else if (arg == "--validate") {
+                if (i + 1 < argVector.size()) {
+                    cslPath = argVector[i + 1];
+                    ++i; // skip next since it's used
+                }
+                else {
+                    printInfo(std::cerr);
+                    std::cerr << "invalid arguments:" << arg;
+                    for (const auto& arg : argVector) {
+                        std::cerr << " " << arg;
+                    }
+                    std::cerr << "\n";
+                    return 2;
+                }
             }
+
+            else if (arg.rfind("--schema=", 0) == 0) {
+                cslSchemaName = arg.substr(9); // skip "--output="
+            }
+            else if (arg == "--schema") {
+                if (i + 1 < argVector.size()) {
+                    cslSchemaName = argVector[i + 1];
+                    ++i; // skip next since it's used
+                }
+                else {
+                    printInfo(std::cerr);
+                    std::cerr << "invalid arguments:" << arg;
+                    for (const auto& arg : argVector) {
+                        std::cerr << " " << arg;
+                    }
+                    std::cerr << "\n";
+                    return 2;
+                }
+            }
+
+            // Check for --output
+            else if (arg.rfind("--output=", 0) == 0) {
+                outputPath = arg.substr(9); // skip "--output="
+            }
+            else if (arg == "--output") {
+                if (i + 1 < argVector.size()) {
+                    outputPath = argVector[i + 1];
+                    ++i; // skip next since it's used
+                }
+                else {
+                    printInfo(std::cerr);
+                    std::cerr << "invalid arguments:" << arg;
+                    for (const auto& arg : argVector) {
+                        std::cerr << " " << arg;
+                    }
+                    std::cerr << "\n";
+                    return 2;
+                }
+            }
+
             else {
                 printInfo(std::cerr);
-                std::cerr << "invalid arguments:";
+                std::cerr << "invalid arguments:" << arg;
                 for (const auto& arg : argVector) {
                     std::cerr << " " << arg;
                 }
@@ -171,12 +232,24 @@ int main(int argc, char* argv[]) {
                 auto inputStream = getStreamForDiskFile(inputPath, std::ios::in);
                 std::vector<std::tuple<std::string, FilePosition::Region>> errors;
                 std::vector<std::tuple<std::string, FilePosition::Region>> warnings;
-                auto [tokenList, lexErrors, lexWarnings] = TomlLexerMain(*inputStream, true);
-                auto [docTree, parseErrors, parseWarnings, tokenDocTreeMapping] = TomlRdparserMain(tokenList);
-                errors.insert(errors.end(), lexErrors.begin(), lexErrors.end());
-                errors.insert(errors.end(), parseErrors.begin(), parseErrors.end());
-                warnings.insert(warnings.end(), lexWarnings.begin(), lexWarnings.end());
-                warnings.insert(warnings.end(), parseWarnings.begin(), parseWarnings.end());
+                auto [tomlTokenList, tomlLexErrors, tomlLexWarnings] = TomlLexerMain(*inputStream, true);
+                auto [docTree, tomlParseErrors, tomlParseWarnings, tokenDocTreeMapping] = TomlRdparserMain(tomlTokenList);
+                errors.insert(errors.end(), tomlLexErrors.begin(), tomlLexErrors.end());
+                errors.insert(errors.end(), tomlParseErrors.begin(), tomlParseErrors.end());
+                warnings.insert(warnings.end(), tomlLexWarnings.begin(), tomlLexWarnings.end());
+                warnings.insert(warnings.end(), tomlParseWarnings.begin(), tomlParseWarnings.end());
+                if (cslPath.size() && std::filesystem::is_regular_file(cslPath)) {
+                    auto cslInputStream = getStreamForDiskFile(cslPath, std::ios::in);
+                    auto [cslTokenList, cslLexErrors, cslLexWarnings] = CslLexerMain(*cslInputStream, false);
+                    auto [schemas, cslParseErrors, cslParseWarnings] = CslRdParserMain(cslTokenList);
+                    auto [cslValidationErrors, cslValidationWarnings] = CslValidatorMain("BuildConfig", schemas, docTree);
+                    errors.insert(errors.end(), cslLexErrors.begin(), cslLexErrors.end());
+                    errors.insert(errors.end(), cslParseErrors.begin(), cslParseErrors.end());
+                    errors.insert(errors.end(), cslValidationErrors.begin(), cslValidationErrors.end());
+                    warnings.insert(warnings.end(), cslLexWarnings.begin(), cslLexWarnings.end());
+                    warnings.insert(warnings.end(), cslParseWarnings.begin(), cslParseWarnings.end());
+                    warnings.insert(warnings.end(), cslValidationWarnings.begin(), cslValidationWarnings.end());
+                }
 #ifdef DEBUG
                 Dump::DumpDocumentTree(docTree);
 #endif // DEBUG
@@ -207,6 +280,11 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
 #endif // DEBUG
+        }
+        else {
+            printInfo(std::cerr);
+            std::cerr << "file " << inputPath << "is not valid\n";
+            return 1;
         }
         for (auto& openedFileStream : openedFileStreams) {
             openedFileStream->flush();

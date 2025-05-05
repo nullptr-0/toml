@@ -6,6 +6,7 @@ A C++20 implementation of a TOML parser and language server with JSON conversion
 
 - **TOML Parsing**: Validates and parses TOML files.
 - **JSON Conversion**: Converts parsed TOML content into JSON format.
+- **Customized Validation**: Validate a TOML file against a CSL schema.
 - **Language Server Support**: LSP integration via standard IO, socket, and named pipe.
 - **Cross-Platform**: Supports Windows, Unix-like systems and NodeJS environment.
 - **Testing**: Works with [toml-test](https://github.com/toml-lang/toml-test) test suite.
@@ -55,6 +56,16 @@ A C++20 implementation of a TOML parser and language server with JSON conversion
 Outputs JSON and error/warning listings (and debug information if DEBUG preprocessor definition is present when building).
 Throws exceptions if DEBUG preprocessor definition is present when building.
 
+### Validate TOML against CSL
+1. **Output to standard IO**
+   ```bash
+   path/to/toml --parse path/to/input.toml --validate path/to/csl.csl
+   ```
+2. **Output to file**
+   ```bash
+   path/to/toml --parse path/to/input.toml --validate path/to/csl.csl --output path/to/output.json
+   ```
+
 ### Run Language Server
 1. **Standard IO Mode**:
    ```bash
@@ -91,6 +102,7 @@ Throws exceptions if DEBUG preprocessor definition is present when building.
 ├── driver/          # Main and test driver
 ├── lexer/           # Lexer
 ├── rdparser/        # Recursive descent parser
+├── validator/       # Validator
 ├── langsvr/         # Language Server
 ├── shared/          # Common utilities
 ├── node/            # NodeJS wrapper

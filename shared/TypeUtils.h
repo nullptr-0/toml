@@ -5,8 +5,7 @@
 
 #include "Type.h"
 
-namespace Type
-{
+namespace Type {
 #ifndef DEF_GLOBAL
     extern Type* CopyType(Type* type);
 #else

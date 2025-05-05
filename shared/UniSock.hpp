@@ -23,7 +23,15 @@
 
 struct SocketAllocator {
     int operator()() {
+#ifdef _WIN32
+// disablw warning C4244: 'initializing': conversion from 'SOCKET' to 'int', possible loss of data
+#pragma warning(push)
+#pragma warning(disable: 4244)
+#endif
         int socketDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+#ifdef _WIN32
+#pragma warning(pop)
+#endif
         if (socketDescriptor < 0) {
             throw std::runtime_error("Failed to create socket");
         }
@@ -137,7 +145,15 @@ public:
         sockaddr_in clientAddr{};
         socklen_t clientAddrLen = sizeof(clientAddr);
 
+#ifdef _WIN32
+// disablw warning C4244: 'initializing': conversion from 'SOCKET' to 'int', possible loss of data
+#pragma warning(push)
+#pragma warning(disable: 4244)
+#endif
         int clientSocketDescriptor = ::accept(socketDescriptor, reinterpret_cast<sockaddr*>(&clientAddr), &clientAddrLen);
+#ifdef _WIN32
+#pragma warning(pop)
+#endif
         if (clientSocketDescriptor < 0) {
             throw std::runtime_error("Failed to accept connection");
         }
