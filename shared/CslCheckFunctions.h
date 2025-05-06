@@ -17,15 +17,20 @@ namespace CSL {
     std::tuple<size_t, std::string> CheckIdentifier(std::string strToCheck) {
         size_t identifierStartIndex;
         std::string identifierContent;
-        std::regex identifierRegex(R"(^(\s*)([a-zA-Z_][a-zA-Z0-9_]*))");
+        std::regex bareIdentifierRegex(R"(^(\s*)([a-zA-Z_][a-zA-Z0-9_]*))");
+        std::regex quotedIdentifierRegex(R"(^(\s*)((`([^`\\]|\\.)*`)|(R`([^()\\]{0,16})\(((.|\n)*?)\)\6`)))");
         std::smatch match;
-        if (std::regex_search(strToCheck, match, identifierRegex) && !match.prefix().length()) {
+        if (std::regex_search(strToCheck, match, bareIdentifierRegex) && !match.prefix().length()) {
             identifierStartIndex = match[1].length();
             identifierContent = match[0].str().substr(identifierStartIndex);
             if (identifierContent == "true" || identifierContent == "false") {
                 identifierStartIndex = 0;
                 identifierContent = "";
             }
+        }
+        else if (std::regex_search(strToCheck, match, quotedIdentifierRegex) && !match.prefix().length()) {
+            identifierStartIndex = match[1].length();
+            identifierContent = match[0].str().substr(identifierStartIndex);
         }
         return { identifierStartIndex, identifierContent };
     }
@@ -297,48 +302,38 @@ namespace CSL {
 #endif
 
 #ifndef DEF_GLOBAL
-    extern bool HasIncompleteString(const std::string& input);
+    extern bool HasIncompleteStringOrId(std::string input);
 #else
-    std::string firstAppearedStringOrCommentStarter(const std::string& input) {
-        size_t posBasicString = input.find("\"");
-        size_t posRawString = input.find("R\"");
-        size_t posComment = input.find("//");
+    bool HasIncompleteStringOrId(std::string input) {
+        std::regex commentRegex(R"(//[^\n]*)");
+        std::regex stringLiteralRegex(R"((\"([^\"\\]|\\.)*\")|(R\"([^()\\]{0,16})\(((.|\n)*?)\)\4\"))");
+        std::regex quotedIdentifierRegex(R"((`([^`\\]|\\.)*`)|(R`([^()\\]{0,16})\(((.|\n)*?)\)\4`))");
+        std::regex startRegex(R"("|R"|`|R`)");
 
-        // Set to string::npos if not found
-        if (posBasicString == std::string::npos) posBasicString = input.length() + 1;
-        if (posRawString == std::string::npos) posRawString = input.length() + 1;
-        if (posComment == std::string::npos) posComment = input.length() + 1;
+        std::regex allRegexes[] = { commentRegex, stringLiteralRegex, quotedIdentifierRegex };
 
-        if (posBasicString < posRawString && posBasicString < posComment) {
-            return "\"";
-        }
-        else if (posRawString < posBasicString && posRawString < posComment) {
-            return "R\"";
-        }
-        else if (posComment < posBasicString && posComment < posRawString) {
-            return "//";
-        }
-        else {
-            return "";
-        }
-    }
+        while (true) {
+            std::optional<std::tuple<size_t, size_t>> bestMatch; // start, length
 
-    bool HasIncompleteString(const std::string& input) {
-        std::regex commentRegex(R"((\s*)(//[^\n]*))");
-        std::regex stringLiteralRegex(R"(^(\s*)((\"([^\"\\]|\\.)*\")|(R\"([^()\\]{0,16})\(((.|\n)*?)\)\6\")))");
-        std::regex stringStartRegex(R"(("|R"))");
+            for (const auto& regex : allRegexes) {
+                std::smatch match;
+                if (std::regex_search(input, match, regex)) {
+                    size_t pos = match.position(0);
+                    size_t len = match.length(0);
+                    if (!bestMatch || pos < std::get<0>(*bestMatch)) {
+                        bestMatch = std::make_tuple(pos, len);
+                    }
+                }
+            }
 
-        bool commentAppearsFirst = firstAppearedStringOrCommentStarter(input) == "//";
+            if (!bestMatch) break;
 
-        auto cleanedInput = std::regex_replace(std::regex_replace(input, commentAppearsFirst ? commentRegex : stringLiteralRegex, ""), commentAppearsFirst ? stringLiteralRegex : commentRegex, "");
-
-        // Check if the input starts with a string start but isn't a complete string
-        std::smatch match;
-        if (std::regex_search(cleanedInput, match, stringStartRegex)) {
-            return true;
+            // Erase the match from the input
+            input.erase(std::get<0>(*bestMatch), std::get<1>(*bestMatch));
         }
 
-        return false;
+        // Final check
+        return std::regex_search(input, startRegex);
     }
 #endif
 }

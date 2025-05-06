@@ -9,7 +9,6 @@
 #include "../shared/Token.h"
 #include "../shared/CSLRepresentation.h"
 #include "../shared/CslOperators.h"
-#include "../shared/CslStringUtils.h"
 
 namespace CSLParser {
 
@@ -116,9 +115,6 @@ namespace CSLParser {
         // Parse a key definition (name: type;)
         TableType::KeyDefinition parseKeyDefinition() {
             auto name = std::get<0>(*position);
-            if (name.size() && (name[0] == '\"' || name[0] == 'R' && name.size() >= 5 && name[1] == '\"')) {
-                name = extractStringLiteralContent(name);
-            }
             bool isOptional = false;
             advance();
 
@@ -480,11 +476,7 @@ namespace CSLParser {
                 advance();
             }
             else if (std::get<1>(*position) == "identifier") {
-                auto curIdentifier = std::get<0>(*position);
-                if (curIdentifier.size() && (curIdentifier[0] == '\"' || curIdentifier[0] == '\'')) {
-                    curIdentifier = extractStringLiteralContent(curIdentifier);
-                }
-                expr = std::make_shared<IdentifierExpr>(curIdentifier, std::get<3>(*position));
+                expr = std::make_shared<IdentifierExpr>(std::get<0>(*position), std::get<3>(*position));
                 advance();
             }
             else if (std::get<1>(*position) == "keyword") {

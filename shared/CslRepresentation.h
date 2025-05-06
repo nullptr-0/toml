@@ -331,7 +331,7 @@ namespace CSL {
         using Value = std::variant<std::shared_ptr<Expr>, std::vector<std::shared_ptr<Expr>>>;
 
         FunctionArgExpr(Value value, FilePosition::Region region)
-            : Expr(Kind::Identifier, region), value(std::move(value)) {
+            : Expr(Kind::FunctionArg, region), value(std::move(value)) {
         }
 
         const Value& getValue() const { return value; }

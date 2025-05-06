@@ -4,6 +4,7 @@
 #include <tuple>
 #include <regex>
 #include "../shared/CslCheckFunctions.h"
+#include "../shared/CslStringUtils.h"
 #include "../shared/Token.h"
 #include "../shared/FilePosition.h"
 
@@ -253,7 +254,7 @@ namespace CSLLexer {
                 else {
                     codeToProcess = curLine;
                 }
-                if (HasIncompleteString(codeToProcess)) {
+                if (HasIncompleteStringOrId(codeToProcess)) {
                     isContinued = true;
                     codeToProcess += "\n";
                     if (inputCode.peek() != -1) {
@@ -261,7 +262,7 @@ namespace CSLLexer {
                     }
                     else {
                         FilePosition::Region errorRegion = { currentPosition.line, { 0, false }, currentPosition.line, { codeToProcess.find('\n'), false } };
-                        errors.push_back({ "String literal is not closed.", errorRegion });
+                        errors.push_back({ "String literal or quoted identifier is not closed.", errorRegion });
                     }
                 }
                 isContinued = false;
@@ -389,7 +390,12 @@ namespace CSLLexer {
                             auto tokenStart = getEndPosition(codeToProcess.substr(0, tokenStartIndex), currentPosition);
                             auto tokenEnd = getEndPosition(tokenContent, tokenStart);
                             FilePosition::Region tokenRegion = { tokenStart, tokenEnd };
-                            tokenList.AddTokenToList(tokenContent, "identifier", nullptr, tokenRegion);
+                            if (tokenContent.size() && (tokenContent[0] == '`' || tokenContent[0] == 'R' && tokenContent.size() >= 5 && tokenContent[1] == '`')) {
+                                tokenList.AddTokenToList(extractQuotedIdentifierContent(tokenContent), "identifier", nullptr, tokenRegion);
+                            }
+                            else {
+                                tokenList.AddTokenToList(tokenContent, "identifier", nullptr, tokenRegion);
+                            }
                             currentPosition = tokenEnd;
                             codeToProcess.erase(0, tokenStartIndex + tokenContent.size());
                             continue;

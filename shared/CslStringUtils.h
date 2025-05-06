@@ -11,6 +11,7 @@
 
 #ifndef DEF_GLOBAL
 extern std::string extractStringLiteralContent(const std::string& stringLiteral);
+extern std::string extractQuotedIdentifierContent(const std::string& quotedIdentifier);
 #else
 std::string unicodeCodePointToUTF8(uint32_t codePoint) {
     std::string utf8;
@@ -65,6 +66,7 @@ std::string processEscapeSequences(const std::string& input) {
             case '\?': result += '\?'; i++; break;
             case '\'': result += '\''; i++; break;
             case '\"': result += '\"'; i++; break;
+            case '`': result += '`'; i++; break;
 
             // Octal escape (up to 3 digits)
             case '0': case '1': case '2': case '3': case '4':
@@ -178,13 +180,33 @@ std::string extractStringLiteralContent(const std::string& stringLiteral) {
     }
 
     if (match[3].matched) { // Regular string
-        return processEscapeSequences(match[4].str());
+        auto matchedStr = match[3].str();
+        return processEscapeSequences(matchedStr.substr(1, matchedStr.length() - 2));
     }
     else if (match[5].matched) { // Raw string
         return match[7].str();
     }
 
     throw std::invalid_argument("Unexpected string literal format");
+}
+
+std::string extractQuotedIdentifierContent(const std::string& quotedIdentifier) {
+    std::regex quotedIdentifierRegex(R"(^(\s*)((`([^`\\]|\\.)*`)|(R`([^()\\]{0,16})\(((.|\n)*?)\)\6`)))");
+    std::smatch match;
+
+    if (!std::regex_match(quotedIdentifier, match, quotedIdentifierRegex)) {
+        throw std::invalid_argument("Input is not a valid quoted identifier");
+    }
+
+    if (match[3].matched) { // Regular quoted identifier
+        auto matchedStr = match[3].str();
+        return processEscapeSequences(matchedStr.substr(1, matchedStr.length() - 2));
+    }
+    else if (match[5].matched) { // Raw quoted identifier
+        return match[7].str();
+    }
+
+    throw std::invalid_argument("Unexpected quoted identifier format");
 }
 #endif
 
