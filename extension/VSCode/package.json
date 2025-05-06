@@ -4,6 +4,7 @@
   "description": "TOML Language Service",
   "version": "0.0.1",
   "author": "nullptr-0",
+  "license": "Apache-2.0",
   "publisher": "nullptr-0",
   "repository": {
     "type": "git",
