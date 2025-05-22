@@ -11,13 +11,15 @@
 template<typename V>
 std::vector<std::pair<std::string, V>> findPairs(const std::unordered_map<std::string, V>& map, const std::string& input) {
     std::vector<std::pair<std::string, V>> result;
-    std::unordered_set<char> inputChars(input.begin(), input.end());
+    std::unordered_set<char> inputChars;
 
     for (const auto& [key, val] : map) {
+        inputChars.insert(input.begin(), input.end());
         std::vector<char> common;
         for (char c : key) {
             if (inputChars.count(c)) {
                 common.push_back(c);
+                inputChars.erase(c);
             }
         }
         if (common.empty()) {
