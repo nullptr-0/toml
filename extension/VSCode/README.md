@@ -13,24 +13,85 @@ A VS Code extension providing TOML language support. Built on top of a native TO
 ## Features
 
 ### ✨ Core Capabilities
-- **Semantic Highlighting**  
-  Colorizes TOML-specific elements include:  
-  - Date-times (`2023-01-01T12:00:00Z`)
-  - Booleans (`true`/`false`)
-  - Identifiers (`key-name`)
 
-- **Document diagnostics**
-  Error and warning diagnostics with precise line/column positioning
+#### 🖍️ Semantic Highlighting
 
-- **Language Server Integration**  
-  Powered by the [native TOML implementation](https://github.com/nullptr-0/toml)
+* Colorizes TOML-specific syntax elements:
+
+  * **Date-times** (`2023-01-01T12:00:00Z`)
+  * **Booleans** (`true` / `false`)
+  * **Numbers** (`0xff`, `1.5e2`)
+  * **Identifiers** (`keyName`)
+  * **Strings** (`"a string"`)
+  * **Punctuators**
+  * **Operators**
+  * **Comments** (`# a comment`)
+
+#### 🛠️ Document Diagnostics
+
+* Reports **errors and warnings** with exact **line/column positioning**
+* CSL (Config Schema Language) validation support - reports schema violations in diagnostics
+
+#### 🔍 Hover Information
+
+* Provides **hover cards** for tables and arrays with:
+
+  * Type info (`Table` / `Array`)
+  * Entry count
+  * Mutability
+  * Defined location (line & column)
+
+#### 🔧 Formatting
+
+* Formats TOML files based on parsed structure
+
+#### 📚 Go to Definition
+
+* Navigates to the definition of a key (table/array)
+
+#### 🔁 Renaming
+
+* Renames **all references** to a key
+* Uses token-to-structure mapping to rename safely and accurately
+
+#### 🔗 Find References
+
+* Finds **all references** to a key in a document
+
+#### 🔄 Ranges Folding
+
+* Supports folding for:
+
+  * **Tables and arrays**
+  * **Multi-line comments**
+
+#### 🔡 Completion Suggestions
+
+* Auto-suggests:
+
+  * Known keys in scope
+  * Schema-defined keys (optional/mandatory)
+* Provides **context-aware completions** including:
+
+  * Dot-navigation (`table.key`)
+  * Schema-aware completions with fallback
+  * Details and definitions for each completion
+
+#### 🧠 Schema Integration (CSL)
+
+* Set of **config schemas** can be provided
+* Dynamically validates and completes keys against selected schema
+* Supports switching active schema on the fly
+
+#### 🧩 Language Server Integration
+* Powered by the [native TOML implementation](https://github.com/nullptr-0/toml)
 
 
-### 🔧 Editor Integration
-- `.toml` file association
-- Bracket matching for tables/arrays
-- Comment toggling (`#` syntax)
-- Auto-closing for brackets and quotations
+### 🧰 Editor Integration
+* `.toml` file association
+* Bracket matching for tables/arrays
+* Comment toggling (`#` syntax)
+* Auto-closing for brackets and quotations
 
 ## Installation
 
